@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IpcChannels, type Api } from '@shared/ipc'
 
 const api: Api = {
-  echo: (message: string) => ipcRenderer.invoke(IpcChannels.echo, message)
+  echo: (message: string) => ipcRenderer.invoke(IpcChannels.echo, message),
+  checkBinaries: () => ipcRenderer.invoke(IpcChannels.binariesCheck)
 }
 
 // contextIsolation jest włączone (patrz main/index.ts), więc mostkujemy przez contextBridge.

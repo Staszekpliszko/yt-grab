@@ -12,7 +12,9 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "lint": "eslint . --max-warnings 0"
+    "lint": "eslint . --max-warnings 0",
+    "fetch-bins:win": "powershell -ExecutionPolicy Bypass -File scripts/fetch-bins.ps1",
+    "fetch-bins:mac": "bash scripts/fetch-bins.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { IpcChannels } from '@shared/ipc'
+import { checkBinaries } from './binaries'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -37,11 +38,24 @@ function createWindow(): void {
 function registerIpc(): void {
   // Etap 1: echo. Kolejne etapy dokładają tu video:analyze, download:*, dialog:*.
   ipcMain.handle(IpcChannels.echo, (_event, message: string): string => `echo: ${message}`)
+  // Etap 2: wykrycie binarek (ścieżki + --version).
+  ipcMain.handle(IpcChannels.binariesCheck, () => checkBinaries())
 }
 
 app.whenReady().then(() => {
   registerIpc()
   createWindow()
+
+  // Bramka Etapu 2: zaloguj wykryte ścieżki i wersje binarek przy starcie.
+  checkBinaries().then((bins) => {
+    for (const b of bins) {
+      if (b.found && b.version) {
+        console.log(`[binaries] ${b.name}: ${b.version}  (${b.path})`)
+      } else {
+        console.warn(`[binaries] ${b.name}: ${b.error}  (${b.path})`)
+      }
+    }
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
