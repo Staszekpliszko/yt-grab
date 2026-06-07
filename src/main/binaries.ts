@@ -18,6 +18,11 @@ function binDir(): string {
   return join(base, 'bin', platform)
 }
 
+/** Katalog z binarkami — przekazywany do yt-dlp jako --ffmpeg-location. */
+export function binariesDir(): string {
+  return binDir()
+}
+
 export function ytDlpPath(): string {
   return join(binDir(), exe('yt-dlp'))
 }

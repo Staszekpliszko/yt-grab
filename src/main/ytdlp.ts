@@ -1,6 +1,6 @@
 import { spawn } from 'child_process'
-import { ytDlpPath } from './binaries'
-import type { FormatInfo, VideoMeta } from '@shared/ipc'
+import { binariesDir, ytDlpPath } from './binaries'
+import type { DownloadResult, DownloadVideoRequest, FormatInfo, VideoMeta } from '@shared/ipc'
 
 /** Podzbiór pól z `yt-dlp -J`, których faktycznie używamy. */
 interface RawFormat {
@@ -43,6 +43,58 @@ export class YtDlpService {
   async analyze(url: string): Promise<VideoMeta> {
     const info = await this.runJson(url)
     return this.toVideoMeta(url, info)
+  }
+
+  /**
+   * Pobiera wybrany format wideo + najlepsze audio i scala do kontenera
+   * (mux robi yt-dlp przez nasz ffmpeg; domyślnie -c copy, rekodowanie tylko gdy konieczne).
+   * Zwraca finalną ścieżkę pliku (po scaleniu/move).
+   */
+  downloadVideo(req: DownloadVideoRequest): Promise<DownloadResult> {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '-f',
+        `${req.formatId}+ba/${req.formatId}`,
+        '--merge-output-format',
+        req.container,
+        '--ffmpeg-location',
+        binariesDir(),
+        '-P',
+        req.outputDir,
+        '-o',
+        '%(title)s [%(height)sp].%(ext)s',
+        '--no-playlist',
+        '--no-simulate',
+        '--print',
+        'after_move:filepath',
+        req.url
+      ]
+
+      let out = ''
+      let err = ''
+      const child = spawn(ytDlpPath(), args)
+
+      child.stdout.on('data', (d) => {
+        out += d.toString()
+      })
+      child.stderr.on('data', (d) => {
+        err += d.toString()
+      })
+      child.on('error', reject)
+      child.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(err.trim() || `yt-dlp zakończył się kodem ${code}.`))
+          return
+        }
+        // after_move:filepath drukuje finalną ścieżkę (ostatnia niepusta linia stdout).
+        const filePath = out.trim().split('\n').map((l) => l.trim()).filter(Boolean).pop()
+        if (!filePath) {
+          reject(new Error('Pobrano, ale nie udało się ustalić ścieżki pliku wyjściowego.'))
+          return
+        }
+        resolve({ filePath })
+      })
+    })
   }
 
   private runJson(url: string): Promise<RawInfo> {

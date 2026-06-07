@@ -7,8 +7,26 @@ export const IpcChannels = {
   /** Etap 2: wykrycie binarek (ścieżki + --version). */
   binariesCheck: 'binaries:check',
   /** Etap 3: analiza filmu (yt-dlp -J → lista formatów). */
-  videoAnalyze: 'video:analyze'
+  videoAnalyze: 'video:analyze',
+  /** Etap 4: pobranie wideo+audio (yt-dlp + mux ffmpeg). */
+  downloadVideo: 'download:video',
+  /** Etap 4: domyślny katalog pobierania (do czasu wyboru folderu w Etapie 7). */
+  downloadsDir: 'paths:downloads'
 } as const
+
+export type VideoContainer = 'mp4' | 'mkv' | 'webm'
+
+export interface DownloadVideoRequest {
+  url: string
+  /** Wybrany format wideo (z tabeli). Audio dobierane automatycznie (best). */
+  formatId: string
+  container: VideoContainer
+  outputDir: string
+}
+
+export interface DownloadResult {
+  filePath: string
+}
 
 /** Status pojedynczej binarki (yt-dlp / ffmpeg / ffprobe). */
 export interface BinaryStatus {
@@ -48,4 +66,6 @@ export interface Api {
   echo: (message: string) => Promise<string>
   checkBinaries: () => Promise<BinaryStatus[]>
   analyze: (url: string) => Promise<VideoMeta>
+  downloadVideo: (req: DownloadVideoRequest) => Promise<DownloadResult>
+  getDownloadsDir: () => Promise<string>
 }

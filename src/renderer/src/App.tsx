@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { BinaryStatus, FormatInfo, VideoMeta } from '@shared/ipc'
+import type { BinaryStatus, FormatInfo, VideoContainer, VideoMeta } from '@shared/ipc'
 
 function formatSize(bytes?: number): string {
   if (!bytes) return '—'
@@ -114,8 +114,15 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [bins, setBins] = useState<BinaryStatus[] | null>(null)
 
+  const [container, setContainer] = useState<VideoContainer>('mp4')
+  const [downloadsDir, setDownloadsDir] = useState('')
+  const [downloading, setDownloading] = useState(false)
+  const [downloadResult, setDownloadResult] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
   useEffect(() => {
     window.api.checkBinaries().then(setBins)
+    window.api.getDownloadsDir().then(setDownloadsDir)
   }, [])
 
   async function analyze() {
@@ -124,10 +131,12 @@ export default function App() {
     setError(null)
     setMeta(null)
     setSelected(null)
+    setDownloadResult(null)
+    setDownloadError(null)
     try {
       const result = await window.api.analyze(url.trim())
       setMeta(result)
-      setSelected(result.formats[0]?.formatId ?? null)
+      setSelected(result.formats.find((f) => f.kind === 'video')?.formatId ?? result.formats[0]?.formatId ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -135,13 +144,34 @@ export default function App() {
     }
   }
 
+  async function download() {
+    if (!meta || !selected) return
+    setDownloading(true)
+    setDownloadResult(null)
+    setDownloadError(null)
+    try {
+      const res = await window.api.downloadVideo({
+        url: meta.url,
+        formatId: selected,
+        container,
+        outputDir: downloadsDir
+      })
+      setDownloadResult(res.filePath)
+    } catch (e) {
+      setDownloadError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   const videos = meta?.formats.filter((f) => f.kind === 'video') ?? []
   const audios = meta?.formats.filter((f) => f.kind === 'audio') ?? []
+  const selectedIsAudio = meta?.formats.find((f) => f.formatId === selected)?.kind === 'audio'
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24, color: '#1a1a1a', maxWidth: 820, margin: '0 auto' }}>
       <h1 style={{ margin: 0 }}>YT-GRAB</h1>
-      <p style={{ color: '#666', marginTop: 4 }}>Analiza filmu (Etap 3).</p>
+      <p style={{ color: '#666', marginTop: 4 }}>Analiza i pobieranie (Etap 4).</p>
 
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
         <input
@@ -190,6 +220,60 @@ export default function App() {
 
           <FormatTable title="Wideo" rows={videos} selected={selected} onSelect={setSelected} />
           <FormatTable title="Audio" rows={audios} selected={selected} onSelect={setSelected} />
+
+          <div style={{ marginTop: 20, padding: 16, borderRadius: 10, background: '#f7f7f5', border: '1px solid #eee' }}>
+            <h3 style={{ margin: '0 0 10px', fontSize: 14 }}>Pobieranie — Wideo + Audio</h3>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label>
+                Kontener:{' '}
+                <select
+                  value={container}
+                  onChange={(e) => setContainer(e.target.value as VideoContainer)}
+                  style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ccc' }}
+                >
+                  <option value="mp4">MP4</option>
+                  <option value="mkv">MKV</option>
+                  <option value="webm">WEBM</option>
+                </select>
+              </label>
+              <button
+                onClick={download}
+                disabled={downloading || !selected}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: downloading ? '#999' : '#0d6efd',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: downloading ? 'default' : 'pointer'
+                }}
+              >
+                {downloading ? 'Pobieram…' : 'Pobierz'}
+              </button>
+            </div>
+
+            {selectedIsAudio && (
+              <div style={{ fontSize: 12, color: '#b06f00', marginTop: 8 }}>
+                Zaznaczono ścieżkę audio — pobieranie „tylko audio" pojawi się w Etapie 5. Wybierz format wideo.
+              </div>
+            )}
+
+            <div style={{ fontSize: 12, color: '#888', marginTop: 8, wordBreak: 'break-all' }}>
+              Folder: {downloadsDir || '…'} <em>(wybór folderu w Etapie 7)</em>
+            </div>
+
+            {downloadResult && (
+              <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: '#eef9f0', border: '1px solid #bfe6c6', color: '#1a7f37', wordBreak: 'break-all' }}>
+                ✓ Pobrano: {downloadResult}
+              </div>
+            )}
+            {downloadError && (
+              <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: '#fdeeee', border: '1px solid #f0c6c6', color: '#b42318', whiteSpace: 'pre-wrap' }}>
+                {downloadError}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

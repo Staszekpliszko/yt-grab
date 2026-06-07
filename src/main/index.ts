@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { IpcChannels } from '@shared/ipc'
+import { IpcChannels, type DownloadVideoRequest } from '@shared/ipc'
 import { checkBinaries } from './binaries'
 import { YtDlpService } from './ytdlp'
 
@@ -45,6 +45,10 @@ function registerIpc(): void {
   ipcMain.handle(IpcChannels.binariesCheck, () => checkBinaries())
   // Etap 3: analiza filmu (yt-dlp -J → lista formatów).
   ipcMain.handle(IpcChannels.videoAnalyze, (_event, url: string) => ytDlp.analyze(url))
+  // Etap 4: pobranie wideo+audio.
+  ipcMain.handle(IpcChannels.downloadVideo, (_event, req: DownloadVideoRequest) => ytDlp.downloadVideo(req))
+  // Etap 4: domyślny katalog pobierania (folder picker dojdzie w Etapie 7).
+  ipcMain.handle(IpcChannels.downloadsDir, () => app.getPath('downloads'))
 }
 
 app.whenReady().then(() => {
