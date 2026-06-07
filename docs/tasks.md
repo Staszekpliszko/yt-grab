@@ -3,7 +3,6 @@
 (Lokalizacja obok kanonicznego planu docs/PLAN.md.)
 
 ## Do zrobienia
-- [ ] Etap 5 — Pobieranie audio
 - [ ] Etap 6 — Progress + anulowanie
 - [ ] Etap 7 — Folder + persystencja + kolejka
 - [ ] Etap 8 — Błędy PL + sanityzacja nazw
@@ -34,3 +33,9 @@
       UI: panel kontener MP4/MKV/WEBM + Pobierz + status.
       Bramka: typecheck/lint/build ✅ · ffprobe potwierdza strumienie i -c copy dla
       MP4 (h264+aac), MKV (h264+opus), WEBM (vp9+opus) ✅ · start+nazwa w UI ✅.
+- [x] Etap 5 — Pobieranie audio
+      YtDlpService.downloadAudio: -f ba/b -x --audio-format <fmt> (mp3: --audio-quality 0);
+      wspólny runDownload() dla video/audio. IPC download:audio + api.downloadAudio;
+      UI: przełącznik Wideo+Audio / Tylko audio + selektor MP3/M4A/OPUS/WAV.
+      Bramka: typecheck/lint/build ✅ · ffprobe ✅ MP3(mp3), M4A(aac), OPUS(opus/ogg),
+      WAV(pcm_s16le) · smoke w UI: pobranie MP3 z Pobranymi ✅.

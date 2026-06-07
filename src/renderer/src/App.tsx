@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { BinaryStatus, FormatInfo, VideoContainer, VideoMeta } from '@shared/ipc'
+import type { AudioFormat, BinaryStatus, FormatInfo, VideoContainer, VideoMeta } from '@shared/ipc'
 
 function formatSize(bytes?: number): string {
   if (!bytes) return '—'
@@ -114,7 +114,9 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [bins, setBins] = useState<BinaryStatus[] | null>(null)
 
+  const [mode, setMode] = useState<'video' | 'audio'>('video')
   const [container, setContainer] = useState<VideoContainer>('mp4')
+  const [audioFormat, setAudioFormat] = useState<AudioFormat>('mp3')
   const [downloadsDir, setDownloadsDir] = useState('')
   const [downloading, setDownloading] = useState(false)
   const [downloadResult, setDownloadResult] = useState<string | null>(null)
@@ -145,17 +147,16 @@ export default function App() {
   }
 
   async function download() {
-    if (!meta || !selected) return
+    if (!meta) return
+    if (mode === 'video' && !selected) return
     setDownloading(true)
     setDownloadResult(null)
     setDownloadError(null)
     try {
-      const res = await window.api.downloadVideo({
-        url: meta.url,
-        formatId: selected,
-        container,
-        outputDir: downloadsDir
-      })
+      const res =
+        mode === 'video'
+          ? await window.api.downloadVideo({ url: meta.url, formatId: selected!, container, outputDir: downloadsDir })
+          : await window.api.downloadAudio({ url: meta.url, audioFormat, outputDir: downloadsDir })
       setDownloadResult(res.filePath)
     } catch (e) {
       setDownloadError(e instanceof Error ? e.message : String(e))
@@ -166,7 +167,6 @@ export default function App() {
 
   const videos = meta?.formats.filter((f) => f.kind === 'video') ?? []
   const audios = meta?.formats.filter((f) => f.kind === 'audio') ?? []
-  const selectedIsAudio = meta?.formats.find((f) => f.formatId === selected)?.kind === 'audio'
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24, color: '#1a1a1a', maxWidth: 820, margin: '0 auto' }}>
@@ -222,23 +222,60 @@ export default function App() {
           <FormatTable title="Audio" rows={audios} selected={selected} onSelect={setSelected} />
 
           <div style={{ marginTop: 20, padding: 16, borderRadius: 10, background: '#f7f7f5', border: '1px solid #eee' }}>
-            <h3 style={{ margin: '0 0 10px', fontSize: 14 }}>Pobieranie — Wideo + Audio</h3>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <label>
-                Kontener:{' '}
-                <select
-                  value={container}
-                  onChange={(e) => setContainer(e.target.value as VideoContainer)}
-                  style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ccc' }}
+            <h3 style={{ margin: '0 0 10px', fontSize: 14 }}>Pobieranie</h3>
+
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {(['video', 'audio'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #ccc',
+                    background: mode === m ? '#1a1a1a' : '#fff',
+                    color: mode === m ? '#fff' : '#333',
+                    cursor: 'pointer',
+                    fontSize: 13
+                  }}
                 >
-                  <option value="mp4">MP4</option>
-                  <option value="mkv">MKV</option>
-                  <option value="webm">WEBM</option>
-                </select>
-              </label>
+                  {m === 'video' ? 'Wideo + Audio' : 'Tylko audio'}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              {mode === 'video' ? (
+                <label>
+                  Kontener:{' '}
+                  <select
+                    value={container}
+                    onChange={(e) => setContainer(e.target.value as VideoContainer)}
+                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ccc' }}
+                  >
+                    <option value="mp4">MP4</option>
+                    <option value="mkv">MKV</option>
+                    <option value="webm">WEBM</option>
+                  </select>
+                </label>
+              ) : (
+                <label>
+                  Format:{' '}
+                  <select
+                    value={audioFormat}
+                    onChange={(e) => setAudioFormat(e.target.value as AudioFormat)}
+                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ccc' }}
+                  >
+                    <option value="mp3">MP3</option>
+                    <option value="m4a">M4A</option>
+                    <option value="opus">OPUS</option>
+                    <option value="wav">WAV</option>
+                  </select>
+                </label>
+              )}
               <button
                 onClick={download}
-                disabled={downloading || !selected}
+                disabled={downloading || (mode === 'video' && !selected)}
                 style={{
                   padding: '8px 16px',
                   borderRadius: 8,
@@ -253,9 +290,9 @@ export default function App() {
               </button>
             </div>
 
-            {selectedIsAudio && (
-              <div style={{ fontSize: 12, color: '#b06f00', marginTop: 8 }}>
-                Zaznaczono ścieżkę audio — pobieranie „tylko audio" pojawi się w Etapie 5. Wybierz format wideo.
+            {mode === 'audio' && (
+              <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+                Pobierane jest najlepsze dostępne audio (zaznaczenie w tabeli nie jest używane w tym trybie).
               </div>
             )}
 

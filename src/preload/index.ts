@@ -6,6 +6,7 @@ const api: Api = {
   checkBinaries: () => ipcRenderer.invoke(IpcChannels.binariesCheck),
   analyze: (url: string) => ipcRenderer.invoke(IpcChannels.videoAnalyze, url),
   downloadVideo: (req) => ipcRenderer.invoke(IpcChannels.downloadVideo, req),
+  downloadAudio: (req) => ipcRenderer.invoke(IpcChannels.downloadAudio, req),
   getDownloadsDir: () => ipcRenderer.invoke(IpcChannels.downloadsDir)
 }
 

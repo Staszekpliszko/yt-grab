@@ -10,17 +10,27 @@ export const IpcChannels = {
   videoAnalyze: 'video:analyze',
   /** Etap 4: pobranie wideo+audio (yt-dlp + mux ffmpeg). */
   downloadVideo: 'download:video',
+  /** Etap 5: pobranie tylko audio (yt-dlp extract-audio + ffmpeg). */
+  downloadAudio: 'download:audio',
   /** Etap 4: domyślny katalog pobierania (do czasu wyboru folderu w Etapie 7). */
   downloadsDir: 'paths:downloads'
 } as const
 
 export type VideoContainer = 'mp4' | 'mkv' | 'webm'
+export type AudioFormat = 'mp3' | 'm4a' | 'opus' | 'wav'
 
 export interface DownloadVideoRequest {
   url: string
   /** Wybrany format wideo (z tabeli). Audio dobierane automatycznie (best). */
   formatId: string
   container: VideoContainer
+  outputDir: string
+}
+
+export interface DownloadAudioRequest {
+  url: string
+  /** Najlepsze audio (ba) ekstrahowane do wybranego formatu. */
+  audioFormat: AudioFormat
   outputDir: string
 }
 
@@ -67,5 +77,6 @@ export interface Api {
   checkBinaries: () => Promise<BinaryStatus[]>
   analyze: (url: string) => Promise<VideoMeta>
   downloadVideo: (req: DownloadVideoRequest) => Promise<DownloadResult>
+  downloadAudio: (req: DownloadAudioRequest) => Promise<DownloadResult>
   getDownloadsDir: () => Promise<string>
 }

@@ -1,7 +1,7 @@
 # Plan: YT-GRAB — desktopowy pobieracz YouTube (Electron + React + yt-dlp)
 
 Data: 2026-06-07
-Status: ZATWIERDZONY (2026-06-07) — Etapy 1–4 gotowe ✓; następny: Etap 5
+Status: ZATWIERDZONY (2026-06-07) — Etapy 1–5 gotowe ✓; następny: Etap 6
 
 ---
 
@@ -211,7 +211,7 @@ Każdy etap kończy się **działającym, zweryfikowanym** stanem. Status trzyma
       (copy/rekod. wg macierzy), MP4/MKV/WEBM. → Bramka: ffprobe potwierdza strumienie, copy tam gdzie plan.
       (Mux: yt-dlp + --merge-output-format + --ffmpeg-location — odstępstwo od osobnej klasy FfmpegService,
       zaakceptowane; happy path, mniej kodu.)
-- [ ] **Etap 5 — Pobieranie audio.** MP3/M4A/OPUS/WAV wg parametrów ffmpeg.
+- [x] **Etap 5 — Pobieranie audio.** MP3/M4A/OPUS/WAV wg parametrów ffmpeg.
       → Bramka: ffprobe potwierdza kodek/kontener każdego formatu.
 - [ ] **Etap 6 — Progress + anulowanie.** `--progress-template`, throttling, kill drzewa
       procesów, sprzątanie `.part`. → Bramka: progress płynny, anuluj zabija i czyści.
