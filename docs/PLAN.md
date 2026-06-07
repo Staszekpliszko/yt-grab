@@ -1,7 +1,7 @@
 # Plan: YT-GRAB — desktopowy pobieracz YouTube (Electron + React + yt-dlp)
 
 Data: 2026-06-07
-Status: ZATWIERDZONY (2026-06-07) — Etapy 1–6 gotowe ✓; następny: Etap 7
+Status: ZATWIERDZONY (2026-06-07) — Etapy 1–7 gotowe ✓; następny: Etap 7b (skórka)
 
 ---
 
@@ -217,8 +217,10 @@ Każdy etap kończy się **działającym, zweryfikowanym** stanem. Status trzyma
       throttling ~4/s, kill drzewa procesów (taskkill /T), sprzątanie `.part`. → Bramka: progress płynny, anuluj zabija i czyści.
       (Bezpieczeństwo: pliki tymczasowe w `temp:<os-temp>/yt-grab/<jobId>`, sprzątane przy końcu/anulowaniu —
       nigdy nie ruszamy plików użytkownika w folderze docelowym.)
-- [ ] **Etap 7 — Folder + persystencja + kolejka.** `dialog:pickOutputDir`, electron-store
+- [x] **Etap 7 — Folder + persystencja + kolejka.** `dialog:pickOutputDir`, electron-store
       `lastOutputDir`, kolejka sekwencyjna. → Bramka: folder przeżywa restart, kolejka leci po kolei.
+      (Kolejka po stronie renderera — sterownik startuje kolejne 'queued' gdy nic się nie pobiera; single-window v1.
+      Smoke interaktywny do potwierdzenia przy Etapie 7b.)
 - [ ] **Etap 7b — Skórka UI wg `YT-GRAB (standalone).html`.** Po skompletowaniu wszystkich
       elementów (analiza, formaty, pobieranie, progress, kolejka, folder) — jeden spójny przebieg
       przebudowy wyglądu renderera na docelowy design (kolory, layout, komponenty z referencji).

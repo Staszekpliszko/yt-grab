@@ -18,8 +18,10 @@ export const IpcChannels = {
   downloadDone: 'download:done',
   /** Etap 6: event błędu (main→renderer). */
   downloadError: 'download:error',
-  /** Etap 4: domyślny katalog pobierania (do czasu wyboru folderu w Etapie 7). */
-  downloadsDir: 'paths:downloads'
+  /** Etap 7: odczyt folderu docelowego (lastOutputDir lub Pobrane). */
+  outputDirGet: 'dir:get',
+  /** Etap 7: natywny dialog wyboru folderu (zapis do electron-store). */
+  outputDirPick: 'dir:pick'
 } as const
 
 /** Status pojedynczej binarki (yt-dlp / ffmpeg / ffprobe). */
@@ -93,7 +95,10 @@ export interface Api {
   echo: (message: string) => Promise<string>
   checkBinaries: () => Promise<BinaryStatus[]>
   analyze: (url: string) => Promise<VideoMeta>
-  getDownloadsDir: () => Promise<string>
+  /** Zwraca aktualny folder docelowy (zapamiętany lub Pobrane). */
+  getOutputDir: () => Promise<string>
+  /** Otwiera dialog wyboru folderu; zwraca wybraną ścieżkę lub null (anulowano). */
+  pickOutputDir: () => Promise<string | null>
   /** Startuje pobranie i zwraca jobId. Postęp/koniec/błąd przez onProgress/onDone/onError. */
   startDownload: (req: DownloadRequest) => Promise<string>
   cancelDownload: (jobId: string) => Promise<void>

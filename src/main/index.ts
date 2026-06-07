@@ -1,9 +1,10 @@
 import { join } from 'path'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { IpcChannels, type DownloadRequest } from '@shared/ipc'
 import { checkBinaries } from './binaries'
 import { YtDlpService } from './ytdlp'
 import { DownloadManager } from './downloads'
+import { getOutputDir, setOutputDir } from './store'
 
 const ytDlp = new YtDlpService()
 const downloads = new DownloadManager()
@@ -50,8 +51,18 @@ function registerIpc(): void {
   // Etap 6: start/anulowanie pobierania (postęp przez eventy download:progress/done/error).
   ipcMain.handle(IpcChannels.downloadStart, (event, req: DownloadRequest) => downloads.start(req, event.sender))
   ipcMain.handle(IpcChannels.downloadCancel, (_event, jobId: string) => downloads.cancel(jobId))
-  // Etap 4: domyślny katalog pobierania (folder picker dojdzie w Etapie 7).
-  ipcMain.handle(IpcChannels.downloadsDir, () => app.getPath('downloads'))
+  // Etap 7: odczyt folderu docelowego (lastOutputDir z electron-store lub Pobrane).
+  ipcMain.handle(IpcChannels.outputDirGet, () => getOutputDir())
+  // Etap 7: natywny dialog wyboru folderu; zapis do electron-store.
+  ipcMain.handle(IpcChannels.outputDirPick, async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const opts: Electron.OpenDialogOptions = { properties: ['openDirectory'], defaultPath: getOutputDir() }
+    const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    if (result.canceled || result.filePaths.length === 0) return null
+    const dir = result.filePaths[0]
+    setOutputDir(dir)
+    return dir
+  })
 }
 
 app.whenReady().then(() => {

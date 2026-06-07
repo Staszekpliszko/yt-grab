@@ -3,7 +3,6 @@
 (Lokalizacja obok kanonicznego planu docs/PLAN.md.)
 
 ## Do zrobienia
-- [ ] Etap 7 — Folder + persystencja + kolejka
 - [ ] Etap 7b — Skórka UI wg standalone.html (po skompletowaniu elementów)
 - [ ] Etap 8 — Błędy PL + sanityzacja nazw
 - [ ] Etap 9 — Pakowanie (electron-builder)
@@ -45,3 +44,9 @@
       sprzątanie temp. Przebudowa na model zdarzeń (start→progress*→done/error). Usunięto stare
       downloadVideo/downloadAudio z YtDlpService. UI: pasek postępu + prędkość/ETA + Anuluj.
       Bramka: typecheck/lint/build ✅ · progress emituje ✅ · routing home/temp + sprzątanie temp ✅.
+- [x] Etap 7 — Folder + persystencja + kolejka
+      electron-store@8 (src/main/store.ts: lastOutputDir/Pobrane); IPC dir:get + dir:pick
+      (dialog.showOpenDialog openDirectory, zapis do store). Kolejka po stronie renderera:
+      QueueItem[] + sterownik sekwencyjny (start kolejnego 'queued' gdy nic nie pobiera),
+      per-element progress + Anuluj/Usuń; globalny wybór folderu z 'Zmień'.
+      Bramka: typecheck/lint/build ✅. Smoke interaktywny (dialog/restart/kolejka) → do potwierdzenia w 7b.
