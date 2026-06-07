@@ -3,7 +3,6 @@
 (Lokalizacja obok kanonicznego planu docs/PLAN.md.)
 
 ## Do zrobienia
-- [ ] Etap 3 — Analiza (video:analyze)
 - [ ] Etap 4 — Pobieranie wideo+audio
 - [ ] Etap 5 — Pobieranie audio
 - [ ] Etap 6 — Progress + anulowanie
@@ -23,3 +22,9 @@
       (src/main/binaries.ts); IPC binaries:check + panel w UI.
       Bramka: typecheck ✅ · lint ✅ · build ✅ · pobrano binarki ✅ ·
       log startowy main: yt-dlp 2026.03.17, ffmpeg/ffprobe N-124868 ✅
+- [x] Etap 3 — Analiza (video:analyze)
+      src/main/ytdlp.ts (YtDlpService: spawn yt-dlp -J, klasyfikacja/dedup/sort →
+      FormatInfo[]); IPC video:analyze; UI: input URL + Analizuj + tabela Wideo/Audio z radio.
+      Bramka: typecheck/lint/build ✅ · smoke na realnym URL ✅ (Resolume tutorial:
+      39 raw → 35 media → 22 unikalnych = „Formatów: 22" w UI; wszystkie rozdzielczości
+      i kodeki avc1/vp9/av01 zachowane).

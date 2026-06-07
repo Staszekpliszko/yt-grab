@@ -1,7 +1,7 @@
 # Plan: YT-GRAB — desktopowy pobieracz YouTube (Electron + React + yt-dlp)
 
 Data: 2026-06-07
-Status: ZATWIERDZONY (2026-06-07) — Etapy 1–2 gotowe ✓; następny: Etap 3
+Status: ZATWIERDZONY (2026-06-07) — Etapy 1–3 gotowe ✓; następny: Etap 4
 
 ---
 
@@ -204,7 +204,7 @@ Każdy etap kończy się **działającym, zweryfikowanym** stanem. Status trzyma
       → Bramka: typecheck/lint/build zielone, okno startuje, echo IPC działa.
 - [x] **Etap 2 — Provisioning binarek.** `scripts/fetch-bins`, resolver ścieżek dev/packaged,
       `bin/` w gitignore. → Bramka: aplikacja loguje wykrytą ścieżkę yt-dlp/ffmpeg i ich `--version`.
-- [ ] **Etap 3 — Analiza (`video:analyze`).** `YtDlpService.analyze` (spawn `-J`, parse),
+- [x] **Etap 3 — Analiza (`video:analyze`).** `YtDlpService.analyze` (spawn `-J`, parse),
       mapowanie do `FormatInfo[]`, IPC + tabela formatów w UI (realne dane zamiast mocków).
       → Bramka: liczba formatów w UI == liczba unikalnych w surowym JSON.
 - [ ] **Etap 4 — Pobieranie wideo+audio.** Selektor formatu, spawn download, mux ffmpeg

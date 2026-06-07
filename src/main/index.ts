@@ -2,6 +2,9 @@ import { join } from 'path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { IpcChannels } from '@shared/ipc'
 import { checkBinaries } from './binaries'
+import { YtDlpService } from './ytdlp'
+
+const ytDlp = new YtDlpService()
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -40,6 +43,8 @@ function registerIpc(): void {
   ipcMain.handle(IpcChannels.echo, (_event, message: string): string => `echo: ${message}`)
   // Etap 2: wykrycie binarek (ścieżki + --version).
   ipcMain.handle(IpcChannels.binariesCheck, () => checkBinaries())
+  // Etap 3: analiza filmu (yt-dlp -J → lista formatów).
+  ipcMain.handle(IpcChannels.videoAnalyze, (_event, url: string) => ytDlp.analyze(url))
 }
 
 app.whenReady().then(() => {

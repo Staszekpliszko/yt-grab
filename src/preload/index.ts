@@ -3,7 +3,8 @@ import { IpcChannels, type Api } from '@shared/ipc'
 
 const api: Api = {
   echo: (message: string) => ipcRenderer.invoke(IpcChannels.echo, message),
-  checkBinaries: () => ipcRenderer.invoke(IpcChannels.binariesCheck)
+  checkBinaries: () => ipcRenderer.invoke(IpcChannels.binariesCheck),
+  analyze: (url: string) => ipcRenderer.invoke(IpcChannels.videoAnalyze, url)
 }
 
 // contextIsolation jest włączone (patrz main/index.ts), więc mostkujemy przez contextBridge.
