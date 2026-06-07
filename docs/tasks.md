@@ -3,8 +3,8 @@
 (Lokalizacja obok kanonicznego planu docs/PLAN.md.)
 
 ## Do zrobienia
-- [ ] Etap 6 — Progress + anulowanie
 - [ ] Etap 7 — Folder + persystencja + kolejka
+- [ ] Etap 7b — Skórka UI wg standalone.html (po skompletowaniu elementów)
 - [ ] Etap 8 — Błędy PL + sanityzacja nazw
 - [ ] Etap 9 — Pakowanie (electron-builder)
 
@@ -39,3 +39,9 @@
       UI: przełącznik Wideo+Audio / Tylko audio + selektor MP3/M4A/OPUS/WAV.
       Bramka: typecheck/lint/build ✅ · ffprobe ✅ MP3(mp3), M4A(aac), OPUS(opus/ogg),
       WAV(pcm_s16le) · smoke w UI: pobranie MP3 z Pobranymi ✅.
+- [x] Etap 6 — Progress + anulowanie
+      src/main/downloads.ts (DownloadManager): spawn z --progress --progress-template (PROG na stdout),
+      throttle ~4/s, eventy download:progress/done/error; temp per job (home:/temp:), kill drzewa (taskkill /T),
+      sprzątanie temp. Przebudowa na model zdarzeń (start→progress*→done/error). Usunięto stare
+      downloadVideo/downloadAudio z YtDlpService. UI: pasek postępu + prędkość/ETA + Anuluj.
+      Bramka: typecheck/lint/build ✅ · progress emituje ✅ · routing home/temp + sprzątanie temp ✅.

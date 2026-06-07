@@ -1,12 +1,6 @@
 import { spawn } from 'child_process'
-import { binariesDir, ytDlpPath } from './binaries'
-import type {
-  DownloadAudioRequest,
-  DownloadResult,
-  DownloadVideoRequest,
-  FormatInfo,
-  VideoMeta
-} from '@shared/ipc'
+import { ytDlpPath } from './binaries'
+import type { FormatInfo, VideoMeta } from '@shared/ipc'
 
 /** Podzbiór pól z `yt-dlp -J`, których faktycznie używamy. */
 interface RawFormat {
@@ -49,84 +43,6 @@ export class YtDlpService {
   async analyze(url: string): Promise<VideoMeta> {
     const info = await this.runJson(url)
     return this.toVideoMeta(url, info)
-  }
-
-  /**
-   * Pobiera wybrany format wideo + najlepsze audio i scala do kontenera
-   * (mux robi yt-dlp przez nasz ffmpeg; domyślnie -c copy, rekodowanie tylko gdy konieczne).
-   */
-  downloadVideo(req: DownloadVideoRequest): Promise<DownloadResult> {
-    return this.runDownload([
-      '-f',
-      `${req.formatId}+ba/${req.formatId}`,
-      '--merge-output-format',
-      req.container,
-      '--ffmpeg-location',
-      binariesDir(),
-      '-P',
-      req.outputDir,
-      '-o',
-      '%(title)s [%(height)sp].%(ext)s',
-      ...this.commonDownloadArgs(req.url)
-    ])
-  }
-
-  /**
-   * Pobiera najlepsze audio (ba) i ekstrahuje do wybranego formatu.
-   * yt-dlp kopiuje strumień gdy format pasuje (m4a←aac, opus←opus), rekoduje gdy trzeba
-   * (mp3 = libmp3lame V0 przez --audio-quality 0, wav = pcm_s16le).
-   */
-  downloadAudio(req: DownloadAudioRequest): Promise<DownloadResult> {
-    const quality = req.audioFormat === 'mp3' ? ['--audio-quality', '0'] : []
-    return this.runDownload([
-      '-f',
-      'ba/b',
-      '-x',
-      '--audio-format',
-      req.audioFormat,
-      ...quality,
-      '--ffmpeg-location',
-      binariesDir(),
-      '-P',
-      req.outputDir,
-      '-o',
-      '%(title)s.%(ext)s',
-      ...this.commonDownloadArgs(req.url)
-    ])
-  }
-
-  /** Wspólne argumenty kończące każde pobranie (no-playlist + druk finalnej ścieżki). */
-  private commonDownloadArgs(url: string): string[] {
-    return ['--no-playlist', '--no-simulate', '--print', 'after_move:filepath', url]
-  }
-
-  /** Uruchamia yt-dlp z podanymi argumentami i zwraca finalną ścieżkę (after_move:filepath). */
-  private runDownload(args: string[]): Promise<DownloadResult> {
-    return new Promise((resolve, reject) => {
-      let out = ''
-      let err = ''
-      const child = spawn(ytDlpPath(), args)
-
-      child.stdout.on('data', (d) => {
-        out += d.toString()
-      })
-      child.stderr.on('data', (d) => {
-        err += d.toString()
-      })
-      child.on('error', reject)
-      child.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(err.trim() || `yt-dlp zakończył się kodem ${code}.`))
-          return
-        }
-        const filePath = out.trim().split('\n').map((l) => l.trim()).filter(Boolean).pop()
-        if (!filePath) {
-          reject(new Error('Pobrano, ale nie udało się ustalić ścieżki pliku wyjściowego.'))
-          return
-        }
-        resolve({ filePath })
-      })
-    })
   }
 
   private runJson(url: string): Promise<RawInfo> {

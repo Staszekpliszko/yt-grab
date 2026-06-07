@@ -1,10 +1,12 @@
 import { join } from 'path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { IpcChannels, type DownloadAudioRequest, type DownloadVideoRequest } from '@shared/ipc'
+import { IpcChannels, type DownloadRequest } from '@shared/ipc'
 import { checkBinaries } from './binaries'
 import { YtDlpService } from './ytdlp'
+import { DownloadManager } from './downloads'
 
 const ytDlp = new YtDlpService()
+const downloads = new DownloadManager()
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -45,10 +47,9 @@ function registerIpc(): void {
   ipcMain.handle(IpcChannels.binariesCheck, () => checkBinaries())
   // Etap 3: analiza filmu (yt-dlp -J → lista formatów).
   ipcMain.handle(IpcChannels.videoAnalyze, (_event, url: string) => ytDlp.analyze(url))
-  // Etap 4: pobranie wideo+audio.
-  ipcMain.handle(IpcChannels.downloadVideo, (_event, req: DownloadVideoRequest) => ytDlp.downloadVideo(req))
-  // Etap 5: pobranie tylko audio.
-  ipcMain.handle(IpcChannels.downloadAudio, (_event, req: DownloadAudioRequest) => ytDlp.downloadAudio(req))
+  // Etap 6: start/anulowanie pobierania (postęp przez eventy download:progress/done/error).
+  ipcMain.handle(IpcChannels.downloadStart, (event, req: DownloadRequest) => downloads.start(req, event.sender))
+  ipcMain.handle(IpcChannels.downloadCancel, (_event, jobId: string) => downloads.cancel(jobId))
   // Etap 4: domyślny katalog pobierania (folder picker dojdzie w Etapie 7).
   ipcMain.handle(IpcChannels.downloadsDir, () => app.getPath('downloads'))
 }

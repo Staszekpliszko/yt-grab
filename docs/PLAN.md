@@ -1,7 +1,7 @@
 # Plan: YT-GRAB — desktopowy pobieracz YouTube (Electron + React + yt-dlp)
 
 Data: 2026-06-07
-Status: ZATWIERDZONY (2026-06-07) — Etapy 1–5 gotowe ✓; następny: Etap 6
+Status: ZATWIERDZONY (2026-06-07) — Etapy 1–6 gotowe ✓; następny: Etap 7
 
 ---
 
@@ -213,10 +213,16 @@ Każdy etap kończy się **działającym, zweryfikowanym** stanem. Status trzyma
       zaakceptowane; happy path, mniej kodu.)
 - [x] **Etap 5 — Pobieranie audio.** MP3/M4A/OPUS/WAV wg parametrów ffmpeg.
       → Bramka: ffprobe potwierdza kodek/kontener każdego formatu.
-- [ ] **Etap 6 — Progress + anulowanie.** `--progress-template`, throttling, kill drzewa
-      procesów, sprzątanie `.part`. → Bramka: progress płynny, anuluj zabija i czyści.
+- [x] **Etap 6 — Progress + anulowanie.** `--progress-template` (+ `--progress` wymagane dla pipe!),
+      throttling ~4/s, kill drzewa procesów (taskkill /T), sprzątanie `.part`. → Bramka: progress płynny, anuluj zabija i czyści.
+      (Bezpieczeństwo: pliki tymczasowe w `temp:<os-temp>/yt-grab/<jobId>`, sprzątane przy końcu/anulowaniu —
+      nigdy nie ruszamy plików użytkownika w folderze docelowym.)
 - [ ] **Etap 7 — Folder + persystencja + kolejka.** `dialog:pickOutputDir`, electron-store
       `lastOutputDir`, kolejka sekwencyjna. → Bramka: folder przeżywa restart, kolejka leci po kolei.
+- [ ] **Etap 7b — Skórka UI wg `YT-GRAB (standalone).html`.** Po skompletowaniu wszystkich
+      elementów (analiza, formaty, pobieranie, progress, kolejka, folder) — jeden spójny przebieg
+      przebudowy wyglądu renderera na docelowy design (kolory, layout, komponenty z referencji).
+      Logika i IPC bez zmian. → Bramka: UI zgodne wizualnie z referencją; typecheck/lint/build; smoke.
 - [ ] **Etap 8 — Błędy PL + sanityzacja nazw.** Mapowanie błędów yt-dlp→PL, sanityzacja nazw
       (polskie znaki zachowane, znaki zakazane `/ : ? "` usunięte). → Bramka: błędne URL/prywatny film → PL, nazwy OK na Win.
 - [ ] **Etap 9 — Pakowanie.** electron-builder (win+mac), `extraResources` z binarkami.

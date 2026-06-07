@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import type { AudioFormat, BinaryStatus, FormatInfo, VideoContainer, VideoMeta } from '@shared/ipc'
+import { useEffect, useRef, useState } from 'react'
+import type { AudioFormat, BinaryStatus, FormatInfo, ProgressEvent, VideoContainer, VideoMeta } from '@shared/ipc'
 
 function formatSize(bytes?: number): string {
   if (!bytes) return '—'
@@ -119,12 +119,37 @@ export default function App() {
   const [audioFormat, setAudioFormat] = useState<AudioFormat>('mp3')
   const [downloadsDir, setDownloadsDir] = useState('')
   const [downloading, setDownloading] = useState(false)
+  const [progress, setProgress] = useState<ProgressEvent | null>(null)
   const [downloadResult, setDownloadResult] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const jobIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     window.api.checkBinaries().then(setBins)
     window.api.getDownloadsDir().then(setDownloadsDir)
+
+    const offProgress = window.api.onProgress((e) => {
+      if (e.jobId === jobIdRef.current) setProgress(e)
+    })
+    const offDone = window.api.onDone((e) => {
+      if (e.jobId !== jobIdRef.current) return
+      jobIdRef.current = null
+      setDownloading(false)
+      setProgress(null)
+      setDownloadResult(e.filePath)
+    })
+    const offError = window.api.onError((e) => {
+      if (e.jobId !== jobIdRef.current) return
+      jobIdRef.current = null
+      setDownloading(false)
+      setProgress(null)
+      setDownloadError(e.error)
+    })
+    return () => {
+      offProgress()
+      offDone()
+      offError()
+    }
   }, [])
 
   async function analyze() {
@@ -150,19 +175,30 @@ export default function App() {
     if (!meta) return
     if (mode === 'video' && !selected) return
     setDownloading(true)
+    setProgress(null)
     setDownloadResult(null)
     setDownloadError(null)
     try {
-      const res =
+      const jobId = await window.api.startDownload(
         mode === 'video'
-          ? await window.api.downloadVideo({ url: meta.url, formatId: selected!, container, outputDir: downloadsDir })
-          : await window.api.downloadAudio({ url: meta.url, audioFormat, outputDir: downloadsDir })
-      setDownloadResult(res.filePath)
+          ? { kind: 'video', url: meta.url, formatId: selected!, container, outputDir: downloadsDir }
+          : { kind: 'audio', url: meta.url, audioFormat, outputDir: downloadsDir }
+      )
+      jobIdRef.current = jobId
     } catch (e) {
-      setDownloadError(e instanceof Error ? e.message : String(e))
-    } finally {
       setDownloading(false)
+      setDownloadError(e instanceof Error ? e.message : String(e))
     }
+  }
+
+  async function cancel() {
+    const jobId = jobIdRef.current
+    if (!jobId) return
+    jobIdRef.current = null
+    await window.api.cancelDownload(jobId)
+    setDownloading(false)
+    setProgress(null)
+    setDownloadError('Anulowano pobieranie.')
   }
 
   const videos = meta?.formats.filter((f) => f.kind === 'video') ?? []
@@ -288,7 +324,43 @@ export default function App() {
               >
                 {downloading ? 'Pobieram…' : 'Pobierz'}
               </button>
+              {downloading && (
+                <button
+                  onClick={cancel}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #b42318',
+                    background: '#fff',
+                    color: '#b42318',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Anuluj
+                </button>
+              )}
             </div>
+
+            {downloading && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ height: 8, background: '#e5e5e5', borderRadius: 4, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      width: `${progress?.percent ?? 0}%`,
+                      height: '100%',
+                      background: '#0d6efd',
+                      transition: 'width .2s'
+                    }}
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
+                  {progress
+                    ? `${progress.percent.toFixed(1)}%  ·  ${progress.speed || '—'}  ·  ETA ${progress.eta || '—'}`
+                    : 'Przygotowywanie…'}
+                </div>
+              </div>
+            )}
 
             {mode === 'audio' && (
               <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>

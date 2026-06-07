@@ -1,13 +1,29 @@
-import { contextBridge, ipcRenderer } from 'electron'
-import { IpcChannels, type Api } from '@shared/ipc'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import {
+  IpcChannels,
+  type Api,
+  type DoneEvent,
+  type ErrorEvent,
+  type ProgressEvent
+} from '@shared/ipc'
+
+/** Pomocnik subskrypcji eventu main→renderer; zwraca funkcję odsubskrybowania. */
+function subscribe<T>(channel: string, cb: (data: T) => void): () => void {
+  const handler = (_e: IpcRendererEvent, data: T): void => cb(data)
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
 
 const api: Api = {
   echo: (message: string) => ipcRenderer.invoke(IpcChannels.echo, message),
   checkBinaries: () => ipcRenderer.invoke(IpcChannels.binariesCheck),
   analyze: (url: string) => ipcRenderer.invoke(IpcChannels.videoAnalyze, url),
-  downloadVideo: (req) => ipcRenderer.invoke(IpcChannels.downloadVideo, req),
-  downloadAudio: (req) => ipcRenderer.invoke(IpcChannels.downloadAudio, req),
-  getDownloadsDir: () => ipcRenderer.invoke(IpcChannels.downloadsDir)
+  getDownloadsDir: () => ipcRenderer.invoke(IpcChannels.downloadsDir),
+  startDownload: (req) => ipcRenderer.invoke(IpcChannels.downloadStart, req),
+  cancelDownload: (jobId) => ipcRenderer.invoke(IpcChannels.downloadCancel, jobId),
+  onProgress: (cb) => subscribe<ProgressEvent>(IpcChannels.downloadProgress, cb),
+  onDone: (cb) => subscribe<DoneEvent>(IpcChannels.downloadDone, cb),
+  onError: (cb) => subscribe<ErrorEvent>(IpcChannels.downloadError, cb)
 }
 
 // contextIsolation jest włączone (patrz main/index.ts), więc mostkujemy przez contextBridge.

@@ -2,41 +2,25 @@
 // Renderer NIGDY nie woła yt-dlp/ffmpeg bezpośrednio — tylko przez te kanały (patrz docs/PLAN.md).
 
 export const IpcChannels = {
-  /** Etap 1: kanał testowy main↔renderer (zostanie usunięty w późniejszych etapach). */
+  /** Etap 1: kanał testowy main↔renderer. */
   echo: 'app:echo',
   /** Etap 2: wykrycie binarek (ścieżki + --version). */
   binariesCheck: 'binaries:check',
   /** Etap 3: analiza filmu (yt-dlp -J → lista formatów). */
   videoAnalyze: 'video:analyze',
-  /** Etap 4: pobranie wideo+audio (yt-dlp + mux ffmpeg). */
-  downloadVideo: 'download:video',
-  /** Etap 5: pobranie tylko audio (yt-dlp extract-audio + ffmpeg). */
-  downloadAudio: 'download:audio',
+  /** Etap 6: start pobierania (zwraca jobId; postęp/koniec przez eventy). */
+  downloadStart: 'download:start',
+  /** Etap 6: anulowanie pobierania. */
+  downloadCancel: 'download:cancel',
+  /** Etap 6: event postępu (main→renderer). */
+  downloadProgress: 'download:progress',
+  /** Etap 6: event zakończenia (main→renderer). */
+  downloadDone: 'download:done',
+  /** Etap 6: event błędu (main→renderer). */
+  downloadError: 'download:error',
   /** Etap 4: domyślny katalog pobierania (do czasu wyboru folderu w Etapie 7). */
   downloadsDir: 'paths:downloads'
 } as const
-
-export type VideoContainer = 'mp4' | 'mkv' | 'webm'
-export type AudioFormat = 'mp3' | 'm4a' | 'opus' | 'wav'
-
-export interface DownloadVideoRequest {
-  url: string
-  /** Wybrany format wideo (z tabeli). Audio dobierane automatycznie (best). */
-  formatId: string
-  container: VideoContainer
-  outputDir: string
-}
-
-export interface DownloadAudioRequest {
-  url: string
-  /** Najlepsze audio (ba) ekstrahowane do wybranego formatu. */
-  audioFormat: AudioFormat
-  outputDir: string
-}
-
-export interface DownloadResult {
-  filePath: string
-}
 
 /** Status pojedynczej binarki (yt-dlp / ffmpeg / ffprobe). */
 export interface BinaryStatus {
@@ -71,12 +55,50 @@ export interface VideoMeta {
   formats: FormatInfo[]
 }
 
+export type VideoContainer = 'mp4' | 'mkv' | 'webm'
+export type AudioFormat = 'mp3' | 'm4a' | 'opus' | 'wav'
+export type DownloadKind = 'video' | 'audio'
+
+/** Żądanie pobrania (wideo+audio lub tylko audio). */
+export interface DownloadRequest {
+  kind: DownloadKind
+  url: string
+  outputDir: string
+  /** kind === 'video': wybrany format wideo + auto best audio. */
+  formatId?: string
+  container?: VideoContainer
+  /** kind === 'audio': format docelowy. */
+  audioFormat?: AudioFormat
+}
+
+export interface ProgressEvent {
+  jobId: string
+  percent: number
+  speed: string
+  eta: string
+}
+
+export interface DoneEvent {
+  jobId: string
+  filePath: string
+}
+
+export interface ErrorEvent {
+  jobId: string
+  error: string
+}
+
 /** API wystawiane do renderera przez preload (window.api). */
 export interface Api {
   echo: (message: string) => Promise<string>
   checkBinaries: () => Promise<BinaryStatus[]>
   analyze: (url: string) => Promise<VideoMeta>
-  downloadVideo: (req: DownloadVideoRequest) => Promise<DownloadResult>
-  downloadAudio: (req: DownloadAudioRequest) => Promise<DownloadResult>
   getDownloadsDir: () => Promise<string>
+  /** Startuje pobranie i zwraca jobId. Postęp/koniec/błąd przez onProgress/onDone/onError. */
+  startDownload: (req: DownloadRequest) => Promise<string>
+  cancelDownload: (jobId: string) => Promise<void>
+  /** Subskrypcje zdarzeń — zwracają funkcję odsubskrybowania. */
+  onProgress: (cb: (e: ProgressEvent) => void) => () => void
+  onDone: (cb: (e: DoneEvent) => void) => () => void
+  onError: (cb: (e: ErrorEvent) => void) => () => void
 }
