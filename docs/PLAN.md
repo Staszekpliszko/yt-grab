@@ -1,7 +1,7 @@
 # Plan: YT-GRAB — desktopowy pobieracz YouTube (Electron + React + yt-dlp)
 
 Data: 2026-06-07
-Status: ZATWIERDZONY (2026-06-07) — Etapy 1–7 gotowe ✓; następny: Etap 7b (skórka)
+Status: ZATWIERDZONY (2026-06-07) — Etapy 1–7b gotowe ✓; następny: Etap 8
 
 ---
 
@@ -221,10 +221,12 @@ Każdy etap kończy się **działającym, zweryfikowanym** stanem. Status trzyma
       `lastOutputDir`, kolejka sekwencyjna. → Bramka: folder przeżywa restart, kolejka leci po kolei.
       (Kolejka po stronie renderera — sterownik startuje kolejne 'queued' gdy nic się nie pobiera; single-window v1.
       Smoke interaktywny do potwierdzenia przy Etapie 7b.)
-- [ ] **Etap 7b — Skórka UI wg `YT-GRAB (standalone).html`.** Po skompletowaniu wszystkich
+- [x] **Etap 7b — Skórka UI wg `YT-GRAB (standalone).html`.** Po skompletowaniu wszystkich
       elementów (analiza, formaty, pobieranie, progress, kolejka, folder) — jeden spójny przebieg
       przebudowy wyglądu renderera na docelowy design (kolory, layout, komponenty z referencji).
       Logika i IPC bez zmian. → Bramka: UI zgodne wizualnie z referencją; typecheck/lint/build; smoke.
+      (Ciemny motyw #0a0b0d/#0d0e11, akcent #ff0033, Inter+JetBrains Mono; 2 kolumny: główny obszar
+      + panel Kolejka. Zweryfikowane wizualnie (puppeteer) w 3 stanach: pusty / po analizie / audio.)
 - [ ] **Etap 8 — Błędy PL + sanityzacja nazw.** Mapowanie błędów yt-dlp→PL, sanityzacja nazw
       (polskie znaki zachowane, znaki zakazane `/ : ? "` usunięte). → Bramka: błędne URL/prywatny film → PL, nazwy OK na Win.
 - [ ] **Etap 9 — Pakowanie.** electron-builder (win+mac), `extraResources` z binarkami.

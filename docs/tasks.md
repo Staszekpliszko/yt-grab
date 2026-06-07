@@ -3,7 +3,6 @@
 (Lokalizacja obok kanonicznego planu docs/PLAN.md.)
 
 ## Do zrobienia
-- [ ] Etap 7b — Skórka UI wg standalone.html (po skompletowaniu elementów)
 - [ ] Etap 8 — Błędy PL + sanityzacja nazw
 - [ ] Etap 9 — Pakowanie (electron-builder)
 
@@ -50,3 +49,9 @@
       QueueItem[] + sterownik sekwencyjny (start kolejnego 'queued' gdy nic nie pobiera),
       per-element progress + Anuluj/Usuń; globalny wybór folderu z 'Zmień'.
       Bramka: typecheck/lint/build ✅. Smoke interaktywny (dialog/restart/kolejka) → do potwierdzenia w 7b.
+- [x] Etap 7b — Skórka UI wg standalone.html
+      Ciemny motyw (paleta wyciągnięta z referencji puppeteerem): tło #0a0b0d, panele #0d0e11,
+      akcent #ff0033, zielony #34d27f, błąd #ff5a7a, Inter + JetBrains Mono. Układ 2-kolumnowy:
+      główny obszar (karta filmu, tabela formatów z badge TYP, TRYB/FORMAT segmenty, folder,
+      wielki Pobierz·rozmiar) + panel Kolejka pobierań (karty statusów, Ponów, Wyczyść).
+      Logika/IPC bez zmian. Bramka: typecheck/lint/build ✅; podgląd puppeteer w 3 stanach ✅.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type {
   AudioFormat,
   BinaryStatus,
@@ -8,13 +8,31 @@ import type {
   VideoMeta
 } from '@shared/ipc'
 
+/* ── Paleta wyciągnięta z YT-GRAB (standalone).html ── */
+const C = {
+  bg: '#0a0b0d',
+  panel: '#0d0e11',
+  surface: '#15171b',
+  surface2: '#191c21',
+  border: '#23272e',
+  borderStrong: '#30353d',
+  text: '#e8eaed',
+  muted: '#939aa4',
+  dim: '#646b75',
+  red: '#ff0033',
+  green: '#34d27f',
+  blue: '#5aa9ff',
+  amber: '#e0a33e',
+  err: '#ff5a7a'
+}
+const MONO = "'JetBrains Mono', ui-monospace, Consolas, monospace"
+
+/* ── Helpery ── */
 function formatSize(bytes?: number): string {
   if (!bytes) return '—'
   const mb = bytes / (1024 * 1024)
-  if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`
-  return `${mb.toFixed(1)} MB`
+  return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(0)} MB`
 }
-
 function formatDuration(sec: number): string {
   if (!sec) return '—'
   const h = Math.floor(sec / 3600)
@@ -23,31 +41,44 @@ function formatDuration(sec: number): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
 }
-
-// Surowe profile kodeków (avc1.640028, av01.0.08M.08…) są nieczytelne — pokazujemy przyjazne nazwy.
 const VIDEO_CODECS: Record<string, string> = {
-  avc1: 'H.264', avc3: 'H.264', h264: 'H.264',
-  hev1: 'H.265', hvc1: 'H.265',
-  vp9: 'VP9', vp09: 'VP9', vp8: 'VP8',
-  av01: 'AV1', av1: 'AV1'
+  avc1: 'H.264', avc3: 'H.264', h264: 'H.264', hev1: 'H.265', hvc1: 'H.265',
+  vp9: 'VP9', vp09: 'VP9', vp8: 'VP8', av01: 'AV1', av1: 'AV1'
 }
 const AUDIO_CODECS: Record<string, string> = {
   mp4a: 'AAC', aac: 'AAC', opus: 'Opus', vorbis: 'Vorbis',
   mp3: 'MP3', 'ac-3': 'AC3', 'ec-3': 'E-AC3', flac: 'FLAC', dts: 'DTS'
 }
-
 function prettyCodec(codec: string | undefined, map: Record<string, string>): string {
   if (!codec) return '—'
-  const base = codec.split('.')[0].toLowerCase()
-  return map[base] ?? codec
+  return map[codec.split('.')[0].toLowerCase()] ?? codec
 }
 
-type QueueStatus = 'queued' | 'downloading' | 'done' | 'error' | 'canceled'
+/* ── Ikony (inline SVG) ── */
+const Ico = {
+  download: (s = 16) => (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v12M7 11l5 5 5-5M5 21h14" />
+    </svg>
+  ),
+  search: (s = 16) => (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+    </svg>
+  ),
+  folder: (s = 16) => (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </svg>
+  )
+}
 
+/* ── Typy kolejki ── */
+type QueueStatus = 'queued' | 'downloading' | 'done' | 'error' | 'canceled'
 interface QueueItem {
   id: string
   title: string
-  label: string
+  meta: string
   request: DownloadRequest
   status: QueueStatus
   percent: number
@@ -58,129 +89,136 @@ interface QueueItem {
   error?: string
 }
 
+/* ── Tabela formatów ── */
 function FormatTable({
-  title,
   rows,
   selected,
   onSelect
 }: {
-  title: string
   rows: FormatInfo[]
   selected: string | null
   onSelect: (id: string) => void
 }) {
-  if (rows.length === 0) return null
   const isVideo = rows[0]?.kind === 'video'
+  const th: CSSProperties = { textAlign: 'left', padding: '8px 10px', fontSize: 11, letterSpacing: '.04em', color: C.dim, fontWeight: 600, textTransform: 'uppercase' }
   return (
-    <div style={{ marginTop: 16 }}>
-      <h3 style={{ fontSize: 14, margin: '0 0 6px' }}>
-        {title} <span style={{ color: '#888', fontWeight: 400 }}>({rows.length})</span>
-      </h3>
+    <div style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
-          <tr style={{ textAlign: 'left', color: '#666', borderBottom: '1px solid #e5e5e5' }}>
-            <th style={{ width: 28 }}></th>
-            <th>{isVideo ? 'Rozdzielczość' : 'Kodek audio'}</th>
-            <th>{isVideo ? 'FPS' : 'Bitrate'}</th>
-            <th>{isVideo ? 'Kodek' : 'Format'}</th>
-            {isVideo && <th>Audio?</th>}
-            <th>Rozmiar</th>
+          <tr style={{ background: C.surface }}>
+            <th style={{ ...th, width: 34 }}></th>
+            <th style={th}>{isVideo ? 'Rozdzielczość' : 'Kodek'}</th>
+            <th style={th}>{isVideo ? 'FPS' : 'Bitrate'}</th>
+            <th style={th}>{isVideo ? 'Kodek' : 'Format'}</th>
+            <th style={th}>Rozmiar</th>
+            {isVideo && <th style={th}>Typ</th>}
           </tr>
         </thead>
         <tbody>
-          {rows.map((f) => (
-            <tr
-              key={f.formatId}
-              onClick={() => onSelect(f.formatId)}
-              style={{
-                cursor: 'pointer',
-                borderBottom: '1px solid #f0f0f0',
-                background: selected === f.formatId ? '#eef4ff' : 'transparent'
-              }}
-            >
-              <td>
-                <input type="radio" name="format" checked={selected === f.formatId} onChange={() => onSelect(f.formatId)} />
-              </td>
-              {isVideo ? (
-                <>
-                  <td>{f.resolution ?? '—'}</td>
-                  <td>{f.fps ?? '—'}</td>
-                  <td title={f.vcodec}>{prettyCodec(f.vcodec, VIDEO_CODECS)}</td>
-                  <td>{f.hasAudio ? 'tak' : 'nie'}</td>
-                </>
-              ) : (
-                <>
-                  <td title={f.acodec}>{prettyCodec(f.acodec, AUDIO_CODECS)}</td>
-                  <td>{f.tbr ? `${Math.round(f.tbr)}k` : '—'}</td>
-                  <td>{f.ext}</td>
-                </>
-              )}
-              <td>{formatSize(f.filesize)}</td>
-            </tr>
-          ))}
+          {rows.map((f) => {
+            const sel = selected === f.formatId
+            const td: CSSProperties = { padding: '9px 10px', borderTop: `1px solid ${C.border}` }
+            return (
+              <tr
+                key={f.formatId}
+                onClick={() => onSelect(f.formatId)}
+                style={{ cursor: 'pointer', background: sel ? C.surface2 : 'transparent', boxShadow: sel ? `inset 3px 0 0 ${C.red}` : 'none' }}
+              >
+                <td style={{ ...td, textAlign: 'center' }}>
+                  <span
+                    style={{
+                      display: 'inline-block', width: 13, height: 13, borderRadius: '50%',
+                      border: `2px solid ${sel ? C.red : C.dim}`, background: sel ? C.red : 'transparent',
+                      boxShadow: sel ? `inset 0 0 0 2px ${C.panel}` : 'none'
+                    }}
+                  />
+                </td>
+                {isVideo ? (
+                  <>
+                    <td style={{ ...td, fontWeight: 600 }}>
+                      {f.resolution ?? '—'}
+                      {f.fps && f.fps >= 48 && <sup style={{ color: C.red, fontSize: 10, marginLeft: 3 }}>{f.fps}</sup>}
+                    </td>
+                    <td style={{ ...td, color: C.muted, fontFamily: MONO }}>{f.fps ?? '—'}</td>
+                    <td style={{ ...td, color: C.muted, fontFamily: MONO }} title={f.vcodec}>{prettyCodec(f.vcodec, VIDEO_CODECS)}</td>
+                    <td style={{ ...td, fontFamily: MONO }}>{formatSize(f.filesize)}</td>
+                    <td style={td}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: f.hasAudio ? C.green : C.muted, fontSize: 12 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: f.hasAudio ? C.green : C.dim }} />
+                        {f.hasAudio ? 'wideo+audio' : 'wideo'}
+                      </span>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td style={{ ...td, fontWeight: 600 }} title={f.acodec}>{prettyCodec(f.acodec, AUDIO_CODECS)}</td>
+                    <td style={{ ...td, color: C.muted, fontFamily: MONO }}>{f.tbr ? `${Math.round(f.tbr)}k` : '—'}</td>
+                    <td style={{ ...td, color: C.muted, fontFamily: MONO }}>{f.ext}</td>
+                    <td style={{ ...td, fontFamily: MONO }}>{formatSize(f.filesize)}</td>
+                  </>
+                )}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
   )
 }
 
-const STATUS_LABEL: Record<QueueStatus, string> = {
-  queued: 'w kolejce',
-  downloading: 'pobieranie',
-  done: 'gotowe',
-  error: 'błąd',
-  canceled: 'anulowano'
-}
+/* ── Karta zadania w kolejce ── */
+const STATUS = {
+  queued: { label: 'w kolejce', color: C.muted, bar: C.dim },
+  downloading: { label: 'pobieranie', color: C.amber, bar: C.amber },
+  done: { label: 'gotowe', color: C.green, bar: C.green },
+  error: { label: 'błąd', color: C.err, bar: C.err },
+  canceled: { label: 'anulowano', color: C.dim, bar: C.dim }
+} as const
 
-function QueueRow({ item, onCancelOrRemove }: { item: QueueItem; onCancelOrRemove: (i: QueueItem) => void }) {
+function QueueCard({ item, onRemove, onRetry }: { item: QueueItem; onRemove: (i: QueueItem) => void; onRetry: (i: QueueItem) => void }) {
+  const st = STATUS[item.status]
+  const isErr = item.status === 'error'
   return (
-    <li style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #eee', background: '#fff', listStyle: 'none' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+    <li style={{
+      listStyle: 'none', padding: 12, borderRadius: 10, background: C.surface,
+      border: `1px solid ${isErr ? '#3a2030' : C.border}`,
+      boxShadow: isErr ? `inset 3px 0 0 ${C.err}` : 'none'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {item.title}
-          </div>
-          <div style={{ fontSize: 12, color: '#888' }}>
-            {item.label} · {STATUS_LABEL[item.status]}
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+          <div style={{ fontSize: 11, color: C.muted, fontFamily: MONO, marginTop: 2 }}>{item.meta}</div>
         </div>
-        <button
-          onClick={() => onCancelOrRemove(item)}
-          style={{
-            flexShrink: 0,
-            padding: '4px 10px',
-            borderRadius: 6,
-            border: '1px solid #ccc',
-            background: '#fff',
-            color: item.status === 'downloading' ? '#b42318' : '#666',
-            cursor: 'pointer',
-            fontSize: 12
-          }}
-        >
-          {item.status === 'downloading' ? 'Anuluj' : 'Usuń'}
-        </button>
+        <button onClick={() => onRemove(item)} title={item.status === 'downloading' ? 'Anuluj' : 'Usuń'}
+          style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, cursor: 'pointer', lineHeight: 1 }}>✕</button>
       </div>
 
-      {item.status === 'downloading' && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ height: 6, background: '#e5e5e5', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ width: `${item.percent}%`, height: '100%', background: '#0d6efd', transition: 'width .2s' }} />
-          </div>
-          <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-            {item.percent.toFixed(1)}% · {item.speed || '—'} · ETA {item.eta || '—'}
-          </div>
+      {(item.status === 'downloading' || item.status === 'done') && (
+        <div style={{ height: 5, background: '#000', borderRadius: 3, overflow: 'hidden', marginTop: 10 }}>
+          <div style={{ width: `${item.percent}%`, height: '100%', background: st.bar, transition: 'width .2s' }} />
         </div>
       )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+        <span style={{ fontSize: 11, color: st.color }}>
+          {item.status === 'downloading' && `${item.percent.toFixed(0)}% · ${item.speed || '—'} · ETA ${item.eta || '—'}`}
+          {item.status === 'done' && '✓ Gotowe'}
+          {item.status === 'error' && `⚠ ${item.error}`}
+          {item.status === 'queued' && st.label}
+          {item.status === 'canceled' && st.label}
+        </span>
+        {isErr && (
+          <button onClick={() => onRetry(item)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, cursor: 'pointer' }}>↻ Ponów</button>
+        )}
+      </div>
       {item.status === 'done' && item.filePath && (
-        <div style={{ fontSize: 11, color: '#1a7f37', marginTop: 6, wordBreak: 'break-all' }}>✓ {item.filePath}</div>
-      )}
-      {item.status === 'error' && item.error && (
-        <div style={{ fontSize: 11, color: '#b42318', marginTop: 6, whiteSpace: 'pre-wrap' }}>{item.error}</div>
+        <div style={{ fontSize: 10, color: C.dim, marginTop: 4, wordBreak: 'break-all', fontFamily: MONO }}>{item.filePath}</div>
       )}
     </li>
   )
 }
 
+/* ── Aplikacja ── */
 export default function App() {
   const [url, setUrl] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
@@ -200,59 +238,42 @@ export default function App() {
   useEffect(() => {
     window.api.checkBinaries().then(setBins)
     window.api.getOutputDir().then(setOutputDir)
-
-    const offProgress = window.api.onProgress((e) =>
-      setQueue((prev) => prev.map((i) => (i.jobId === e.jobId ? { ...i, percent: e.percent, speed: e.speed, eta: e.eta } : i)))
-    )
-    const offDone = window.api.onDone((e) =>
-      setQueue((prev) => prev.map((i) => (i.jobId === e.jobId ? { ...i, status: 'done', percent: 100, filePath: e.filePath } : i)))
-    )
-    const offError = window.api.onError((e) =>
-      setQueue((prev) => prev.map((i) => (i.jobId === e.jobId ? { ...i, status: 'error', error: e.error } : i)))
-    )
-    return () => {
-      offProgress()
-      offDone()
-      offError()
-    }
+    const offP = window.api.onProgress((e) => setQueue((q) => q.map((i) => (i.jobId === e.jobId ? { ...i, percent: e.percent, speed: e.speed, eta: e.eta } : i))))
+    const offD = window.api.onDone((e) => setQueue((q) => q.map((i) => (i.jobId === e.jobId ? { ...i, status: 'done', percent: 100, filePath: e.filePath } : i))))
+    const offE = window.api.onError((e) => setQueue((q) => q.map((i) => (i.jobId === e.jobId ? { ...i, status: 'error', error: e.error } : i))))
+    return () => { offP(); offD(); offE() }
   }, [])
 
-  // Sterownik kolejki: gdy nic się nie pobiera, startuj następne 'queued' (sekwencyjnie).
+  // Sterownik kolejki — sekwencyjnie startuje kolejne 'queued'.
   useEffect(() => {
-    if (startingRef.current) return
-    if (queue.some((i) => i.status === 'downloading')) return
+    if (startingRef.current || queue.some((i) => i.status === 'downloading')) return
     const next = queue.find((i) => i.status === 'queued')
     if (!next) return
-
     startingRef.current = true
-    window.api
-      .startDownload(next.request)
-      .then((jobId) => {
-        setQueue((prev) => prev.map((i) => (i.id === next.id ? { ...i, status: 'downloading', jobId, percent: 0 } : i)))
-      })
-      .catch((e) => {
-        setQueue((prev) => prev.map((i) => (i.id === next.id ? { ...i, status: 'error', error: String(e) } : i)))
-      })
-      .finally(() => {
-        startingRef.current = false
-      })
+    window.api.startDownload(next.request)
+      .then((jobId) => setQueue((q) => q.map((i) => (i.id === next.id ? { ...i, status: 'downloading', jobId, percent: 0 } : i))))
+      .catch((e) => setQueue((q) => q.map((i) => (i.id === next.id ? { ...i, status: 'error', error: String(e) } : i))))
+      .finally(() => { startingRef.current = false })
   }, [queue])
 
   async function analyze() {
     if (!url.trim()) return
-    setAnalyzing(true)
-    setError(null)
-    setMeta(null)
-    setSelected(null)
+    setAnalyzing(true); setError(null); setMeta(null); setSelected(null)
     try {
-      const result = await window.api.analyze(url.trim())
-      setMeta(result)
-      setSelected(result.formats.find((f) => f.kind === 'video')?.formatId ?? result.formats[0]?.formatId ?? null)
+      const r = await window.api.analyze(url.trim())
+      setMeta(r)
+      setSelected(r.formats.find((f) => f.kind === 'video')?.formatId ?? r.formats[0]?.formatId ?? null)
+      setMode('video')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  function switchMode(m: 'video' | 'audio') {
+    setMode(m)
+    if (meta) setSelected(meta.formats.find((f) => f.kind === m)?.formatId ?? null)
   }
 
   async function pickFolder() {
@@ -262,159 +283,186 @@ export default function App() {
 
   function addToQueue() {
     if (!meta) return
-    if (mode === 'video' && !selected) return
     const sel = meta.formats.find((f) => f.formatId === selected)
-    const label = mode === 'video' ? `${sel?.resolution ?? '?'} · ${container.toUpperCase()}` : `Audio · ${audioFormat.toUpperCase()}`
-    const request: DownloadRequest =
-      mode === 'video'
-        ? { kind: 'video', url: meta.url, formatId: selected!, container, outputDir }
-        : { kind: 'audio', url: meta.url, audioFormat, outputDir }
-    const id = `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    setQueue((prev) => [...prev, { id, title: meta.title, label, request, status: 'queued', percent: 0 }])
-  }
-
-  function cancelOrRemove(item: QueueItem) {
-    if (item.status === 'downloading' && item.jobId) {
-      window.api.cancelDownload(item.jobId)
-      setQueue((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: 'canceled' } : i)))
+    if (mode === 'video') {
+      if (!sel || sel.kind !== 'video') return
+      const m = `${sel.resolution ?? '?'} · ${container.toUpperCase()} · ${prettyCodec(sel.vcodec, VIDEO_CODECS)}`
+      addItem(m, { kind: 'video', url: meta.url, formatId: sel.formatId, container, outputDir })
     } else {
-      setQueue((prev) => prev.filter((i) => i.id !== item.id))
+      addItem(`${audioFormat.toUpperCase()} · best audio`, { kind: 'audio', url: meta.url, audioFormat, outputDir })
     }
   }
+  function addItem(metaLine: string, request: DownloadRequest) {
+    const id = `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    setQueue((q) => [...q, { id, title: meta?.title ?? 'Pobieranie', meta: metaLine, request, status: 'queued', percent: 0 }])
+  }
+  function removeItem(item: QueueItem) {
+    if (item.status === 'downloading' && item.jobId) {
+      window.api.cancelDownload(item.jobId)
+      setQueue((q) => q.map((i) => (i.id === item.id ? { ...i, status: 'canceled' } : i)))
+    } else {
+      setQueue((q) => q.filter((i) => i.id !== item.id))
+    }
+  }
+  function retryItem(item: QueueItem) {
+    setQueue((q) => q.map((i) => (i.id === item.id ? { ...i, status: 'queued', percent: 0, error: undefined, jobId: undefined } : i)))
+  }
+  function clearFinished() {
+    setQueue((q) => q.filter((i) => i.status === 'queued' || i.status === 'downloading'))
+  }
 
-  const videos = meta?.formats.filter((f) => f.kind === 'video') ?? []
-  const audios = meta?.formats.filter((f) => f.kind === 'audio') ?? []
+  const rows = meta ? meta.formats.filter((f) => f.kind === mode) : []
+  const selectedFmt = meta?.formats.find((f) => f.formatId === selected)
+  const doneCount = queue.filter((i) => i.status === 'done').length
+  const btnSize = mode === 'video' ? formatSize(selectedFmt?.filesize) : ''
+
+  /* ── Style współdzielone ── */
+  const card: CSSProperties = { background: C.panel, border: `1px solid ${C.borderStrong}`, borderRadius: 12 }
+  const toggleBtn = (active: boolean): CSSProperties => ({
+    padding: '7px 14px', borderRadius: 7, border: `1px solid ${active ? 'transparent' : C.border}`,
+    background: active ? (C.red) : 'transparent', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+  })
+  const segBtn = (active: boolean): CSSProperties => ({
+    padding: '7px 14px', borderRadius: 7, border: 'none',
+    background: active ? C.surface2 : 'transparent', color: active ? C.text : C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer'
+  })
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24, color: '#1a1a1a', maxWidth: 820, margin: '0 auto' }}>
-      <h1 style={{ margin: 0 }}>YT-GRAB</h1>
-      <p style={{ color: '#666', marginTop: 4 }}>Analiza, kolejka i pobieranie (Etap 7).</p>
+    <div style={{ minHeight: '100vh', padding: 18, boxSizing: 'border-box' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px 14px' }}>
+        <div style={{ width: 30, height: 30, borderRadius: 9, background: C.red, display: 'grid', placeItems: 'center', color: '#fff' }}>{Ico.download(17)}</div>
+        <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '.02em' }}>
+          <span style={{ color: '#fff' }}>YT</span><span style={{ color: C.red }}>-GRAB</span>
+        </div>
+        <span style={{ color: C.dim, fontSize: 12, fontFamily: MONO }}>v0.1.0</span>
+      </div>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && analyze()}
-          placeholder="Wklej link do filmu YouTube…"
-          style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-        />
+      {/* URL bar */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', ...card, borderColor: C.border }}>
+          <span style={{ color: C.dim }}>🔗</span>
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && analyze()}
+            placeholder="Wklej adres URL filmu z YouTube…"
+            style={{ flex: 1, padding: '13px 0', border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 14 }}
+          />
+          {url && <button onClick={() => setUrl('')} style={{ border: 'none', background: 'transparent', color: C.dim, cursor: 'pointer', fontSize: 16 }}>✕</button>}
+        </div>
         <button
           onClick={analyze}
           disabled={analyzing || !url.trim()}
-          style={{
-            padding: '10px 18px', borderRadius: 8, border: 'none',
-            background: analyzing ? '#999' : '#ff0033', color: '#fff', fontWeight: 600,
-            cursor: analyzing ? 'default' : 'pointer'
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 22px', borderRadius: 12, border: 'none', background: analyzing || !url.trim() ? '#5a1020' : C.red, color: '#fff', fontWeight: 700, fontSize: 14, cursor: analyzing || !url.trim() ? 'default' : 'pointer' }}
         >
-          {analyzing ? 'Analizuję…' : 'Analizuj'}
-        </button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, fontSize: 13 }}>
-        <span style={{ color: '#666' }}>Folder:</span>
-        <span style={{ flex: 1, color: '#333', wordBreak: 'break-all' }}>{outputDir || '…'}</span>
-        <button
-          onClick={pickFolder}
-          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
-        >
-          Zmień
+          {Ico.search(16)} {analyzing ? 'Analizuję…' : 'Analizuj'}
         </button>
       </div>
 
       {error && (
-        <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8, background: '#fdeeee', border: '1px solid #f0c6c6', color: '#b42318', whiteSpace: 'pre-wrap' }}>
-          {error}
-        </div>
+        <div style={{ marginTop: 14, padding: '11px 14px', borderRadius: 10, background: '#211519', border: '1px solid #3a2030', color: C.err, whiteSpace: 'pre-wrap', fontSize: 13 }}>{error}</div>
       )}
 
-      {meta && (
-        <div style={{ marginTop: 20 }}>
-          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-            {meta.thumbnail && <img src={meta.thumbnail} alt="" style={{ width: 160, borderRadius: 8, flexShrink: 0 }} />}
-            <div>
-              <h2 style={{ fontSize: 17, margin: 0 }}>{meta.title}</h2>
-              <p style={{ color: '#666', margin: '4px 0' }}>
-                Czas: {formatDuration(meta.durationSec)} · Formatów: {meta.formats.length}
-              </p>
+      {/* Dwie kolumny */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 16, marginTop: 16, alignItems: 'start' }}>
+        {/* Lewa: główny obszar */}
+        <div style={{ ...card, padding: 16, minHeight: 420 }}>
+          {!meta ? (
+            <div style={{ height: 420, display: 'grid', placeItems: 'center', textAlign: 'center', color: C.muted }}>
+              <div>
+                <div style={{ width: 56, height: 56, borderRadius: 14, background: C.surface, display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: C.muted }}>{Ico.search(24)}</div>
+                <div style={{ color: C.text, fontWeight: 700, fontSize: 15 }}>Brak wczytanego filmu</div>
+                <div style={{ fontSize: 13, marginTop: 6, maxWidth: 320 }}>Wklej adres URL z YouTube powyżej i kliknij „Analizuj", aby pobrać listę dostępnych formatów.</div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Karta filmu */}
+              <div style={{ display: 'flex', gap: 14 }}>
+                <div style={{ position: 'relative', width: 168, flexShrink: 0 }}>
+                  {meta.thumbnail
+                    ? <img src={meta.thumbnail} alt="" style={{ width: '100%', borderRadius: 10, display: 'block' }} />
+                    : <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, background: C.surface }} />}
+                  <span style={{ position: 'absolute', right: 6, bottom: 6, background: 'rgba(0,0,0,.8)', color: '#fff', fontSize: 11, padding: '1px 6px', borderRadius: 4, fontFamily: MONO }}>{formatDuration(meta.durationSec)}</span>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={{ fontSize: 16, margin: 0, lineHeight: 1.3 }}>{meta.title}</h2>
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 8, fontFamily: MONO }}>{meta.formats.length} formatów · {formatDuration(meta.durationSec)}</div>
+                </div>
+              </div>
 
-          <FormatTable title="Wideo" rows={videos} selected={selected} onSelect={setSelected} />
-          <FormatTable title="Audio" rows={audios} selected={selected} onSelect={setSelected} />
+              <FormatTable rows={rows} selected={selected} onSelect={setSelected} />
 
-          <div style={{ marginTop: 20, padding: 16, borderRadius: 10, background: '#f7f7f5', border: '1px solid #eee' }}>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-              {(['video', 'audio'] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 6, border: '1px solid #ccc',
-                    background: mode === m ? '#1a1a1a' : '#fff', color: mode === m ? '#fff' : '#333',
-                    cursor: 'pointer', fontSize: 13
-                  }}
-                >
-                  {m === 'video' ? 'Wideo + Audio' : 'Tylko audio'}
-                </button>
-              ))}
-            </div>
+              {/* TRYB / FORMAT */}
+              <div style={{ display: 'flex', gap: 18, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: C.dim, fontWeight: 600 }}>TRYB</span>
+                  <div style={{ display: 'flex', gap: 4, background: C.surface, padding: 4, borderRadius: 10 }}>
+                    <button onClick={() => switchMode('video')} style={toggleBtn(mode === 'video')}>Wideo+Audio</button>
+                    <button onClick={() => switchMode('audio')} style={mode === 'audio' ? toggleBtn(true) : segBtn(false)}>Tylko audio</button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: C.dim, fontWeight: 600 }}>FORMAT</span>
+                  <div style={{ display: 'flex', gap: 4, background: C.surface, padding: 4, borderRadius: 10 }}>
+                    {mode === 'video'
+                      ? (['mp4', 'mkv', 'webm'] as VideoContainer[]).map((c) => (
+                          <button key={c} onClick={() => setContainer(c)} style={segBtn(container === c)}>{c.toUpperCase()}</button>
+                        ))
+                      : (['mp3', 'm4a', 'opus', 'wav'] as AudioFormat[]).map((a) => (
+                          <button key={a} onClick={() => setAudioFormat(a)} style={segBtn(audioFormat === a)}>{a.toUpperCase()}</button>
+                        ))}
+                  </div>
+                </div>
+              </div>
 
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              {mode === 'video' ? (
-                <label>
-                  Kontener:{' '}
-                  <select value={container} onChange={(e) => setContainer(e.target.value as VideoContainer)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ccc' }}>
-                    <option value="mp4">MP4</option>
-                    <option value="mkv">MKV</option>
-                    <option value="webm">WEBM</option>
-                  </select>
-                </label>
-              ) : (
-                <label>
-                  Format:{' '}
-                  <select value={audioFormat} onChange={(e) => setAudioFormat(e.target.value as AudioFormat)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ccc' }}>
-                    <option value="mp3">MP3</option>
-                    <option value="m4a">M4A</option>
-                    <option value="opus">OPUS</option>
-                    <option value="wav">WAV</option>
-                  </select>
-                </label>
-              )}
+              {/* Folder */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, padding: '10px 12px', background: C.surface, borderRadius: 10 }}>
+                <span style={{ color: C.dim }}>{Ico.folder(16)}</span>
+                <span style={{ flex: 1, fontSize: 12, color: C.muted, fontFamily: MONO, wordBreak: 'break-all' }}>{outputDir || '…'}</span>
+                <button onClick={pickFolder} style={{ padding: '6px 14px', borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface2, color: C.text, cursor: 'pointer', fontSize: 13 }}>Zmień…</button>
+              </div>
+
+              {/* Pobierz */}
               <button
                 onClick={addToQueue}
-                disabled={mode === 'video' && !selected}
-                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#0d6efd', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                disabled={mode === 'video' && !selectedFmt}
+                style={{ width: '100%', marginTop: 14, padding: '14px', borderRadius: 11, border: 'none', background: C.red, color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
-                Dodaj do kolejki
+                {Ico.download(18)} Pobierz{btnSize && btnSize !== '—' ? ` · ${btnSize}` : ''}
               </button>
-            </div>
+            </>
+          )}
+        </div>
 
-            {mode === 'audio' && (
-              <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-                Pobierane jest najlepsze dostępne audio (zaznaczenie w tabeli nie jest używane w tym trybie).
-              </div>
-            )}
+        {/* Prawa: kolejka */}
+        <div style={{ ...card, padding: 14, minHeight: 420 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: C.red }}>{Ico.download(16)}</span>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>Kolejka pobierań</span>
+            {queue.length > 0 && <span style={{ fontSize: 11, color: C.dim, fontFamily: MONO }}>{doneCount}/{queue.length}</span>}
+            <span style={{ flex: 1 }} />
+            {queue.length > 0 && <button onClick={clearFinished} style={{ fontSize: 12, color: C.muted, background: 'transparent', border: 'none', cursor: 'pointer' }}>Wyczyść</button>}
           </div>
-        </div>
-      )}
 
-      {queue.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <h2 style={{ fontSize: 16, margin: '0 0 10px' }}>
-            Kolejka <span style={{ color: '#888', fontWeight: 400 }}>({queue.length})</span>
-          </h2>
-          <ul style={{ display: 'grid', gap: 8, padding: 0, margin: 0 }}>
-            {queue.map((item) => (
-              <QueueRow key={item.id} item={item} onCancelOrRemove={cancelOrRemove} />
-            ))}
-          </ul>
+          {queue.length === 0 ? (
+            <div style={{ height: 360, display: 'grid', placeItems: 'center', textAlign: 'center', color: C.muted }}>
+              <div>
+                <div style={{ width: 48, height: 48, borderRadius: 12, border: `1px solid ${C.border}`, display: 'grid', placeItems: 'center', margin: '0 auto 12px', color: C.dim }}>{Ico.download(20)}</div>
+                <div style={{ fontSize: 13 }}>Brak zadań. Wybierz format<br />i kliknij <b style={{ color: C.text }}>Pobierz</b>.</div>
+              </div>
+            </div>
+          ) : (
+            <ul style={{ display: 'grid', gap: 8, padding: 0, margin: '12px 0 0' }}>
+              {queue.map((i) => <QueueCard key={i.id} item={i} onRemove={removeItem} onRetry={retryItem} />)}
+            </ul>
+          )}
         </div>
-      )}
+      </div>
 
-      <div style={{ marginTop: 28, paddingTop: 12, borderTop: '1px solid #eee', fontSize: 12, color: '#999' }}>
-        Binarki:{' '}
-        {bins === null ? 'sprawdzam…' : bins.map((b) => `${b.name} ${b.found && b.version ? '✓' : '✗'}`).join('  ·  ')}
+      <div style={{ marginTop: 18, fontSize: 11, color: C.dim, fontFamily: MONO, textAlign: 'right' }}>
+        {bins === null ? 'binarki: …' : bins.map((b) => `${b.name} ${b.found && b.version ? '✓' : '✗'}`).join('  ·  ')}
       </div>
     </div>
   )
