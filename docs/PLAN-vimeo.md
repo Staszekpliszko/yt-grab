@@ -1,7 +1,7 @@
 # Plan: Obsługa Vimeo w YT-GRAB
 
 Data: 2026-06-08
-Status: DO ZATWIERDZENIA
+Status: ZWALIDOWANE ✓ (Etapy V1–V4, 2026-06-08) — V5 odłożone do Etapu 8 głównego planu
 Powiązanie: rozszerzenie głównego `docs/PLAN.md` (Etapy 1–9). Wchodzi jako równoległy
 tor po Etapie 7b; Etap V5 spina się z Etapem 8 (błędy PL).
 
