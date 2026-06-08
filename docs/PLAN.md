@@ -1,7 +1,7 @@
 # Plan: YT-GRAB — desktopowy pobieracz YouTube (Electron + React + yt-dlp)
 
 Data: 2026-06-07
-Status: ZATWIERDZONY (2026-06-07) — Etapy 1–7b gotowe ✓; następny: Etap 8
+Status: ZATWIERDZONY (2026-06-07) — Etapy 1–8 gotowe ✓ (+ tor Vimeo V1–V4, docs/PLAN-vimeo.md); następny: Etap 9
 
 ---
 
@@ -227,8 +227,12 @@ Każdy etap kończy się **działającym, zweryfikowanym** stanem. Status trzyma
       Logika i IPC bez zmian. → Bramka: UI zgodne wizualnie z referencją; typecheck/lint/build; smoke.
       (Ciemny motyw #0a0b0d/#0d0e11, akcent #ff0033, Inter+JetBrains Mono; 2 kolumny: główny obszar
       + panel Kolejka. Zweryfikowane wizualnie (puppeteer) w 3 stanach: pusty / po analizie / audio.)
-- [ ] **Etap 8 — Błędy PL + sanityzacja nazw.** Mapowanie błędów yt-dlp→PL, sanityzacja nazw
+- [x] **Etap 8 — Błędy PL + sanityzacja nazw.** Mapowanie błędów yt-dlp→PL, sanityzacja nazw
       (polskie znaki zachowane, znaki zakazane `/ : ? "` usunięte). → Bramka: błędne URL/prywatny film → PL, nazwy OK na Win.
+      (Nowy moduł `src/main/errors.ts` — `mapErrorToPL`; wpięty w analyze + download. Obejmuje też V5 Vimeo
+      (prywatny/hasło/embed-only/geo). Nazwy: `--windows-filenames` + `--trim-filenames 200` +
+      `--replace-in-metadata title [/:*?"<>|]` (BEZ `--restrict-filenames` → polskie znaki zostają).
+      Bonus: `--encoding UTF-8` naprawia polskie znaki w `after_move:filepath` (inaczej „Otwórz plik" zawodził).)
 - [ ] **Etap 9 — Pakowanie.** electron-builder (win+mac), `extraResources` z binarkami.
       → Bramka: paczka startuje i znajduje binarki z `resources`.
 

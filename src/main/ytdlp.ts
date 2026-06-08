@@ -3,6 +3,7 @@ import { ytDlpPath } from './binaries'
 import type { FormatInfo, VideoMeta } from '@shared/ipc'
 import { detectSource } from './sources/detect'
 import { vimeoToVideoMeta } from './sources/vimeo'
+import { mapErrorToPL } from './errors'
 
 /** Podzbiór pól z `yt-dlp -J`, których faktycznie używamy. */
 export interface RawFormat {
@@ -92,8 +93,7 @@ export class YtDlpService {
             reject(new Error('Nie udało się sparsować odpowiedzi yt-dlp (-J).'))
           }
         } else {
-          // Pełne mapowanie błędów na PL przyjdzie w Etapie 8 — na razie surowy stderr.
-          reject(new Error(err.trim() || `yt-dlp zakończył się kodem ${code}.`))
+          reject(new Error(mapErrorToPL(err)))
         }
       })
     })

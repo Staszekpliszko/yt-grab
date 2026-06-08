@@ -13,6 +13,6 @@
 - [x] V4 — UI: teksty „YouTube/Vimeo", etykieta kolejki MP4 dla Vimeo+WEBM, banner WEBM→MP4; grep renderera czysty
 
 ## Poza tym torem
-- V5 — błędy PL Vimeo: realizowane razem z Etapem 8 głównego planu (docs/PLAN.md)
+- [x] V5 — błędy PL Vimeo: zrealizowane w Etapie 8 (src/main/errors.ts — reguły hasło/embed-only/geo/usunięty)
 
 ## Zasada: ZERO regresji YT — ścieżka YouTube nietknięta (nowe pliki, minimalny `if` w punkcie wejścia)

@@ -5,6 +5,7 @@ import { app, type WebContents } from 'electron'
 import { binariesDir, ytDlpPath } from './binaries'
 import { detectSource } from './sources/detect'
 import { vimeoVideoSelector } from './sources/vimeo'
+import { mapErrorToPL } from './errors'
 import {
   IpcChannels,
   type DoneEvent,
@@ -77,7 +78,7 @@ export class DownloadManager {
       } else {
         sender.send(IpcChannels.downloadError, {
           jobId,
-          error: err.trim() || `yt-dlp zakończył się kodem ${code}.`
+          error: mapErrorToPL(err)
         } satisfies ErrorEvent)
       }
     })
@@ -120,6 +121,10 @@ export class DownloadManager {
 
   private buildArgs(req: DownloadRequest, tmpDir: string): string[] {
     const tail = [
+      // Wymuś UTF-8 na stdout — bez tego yt-dlp drukuje ścieżkę (after_move:filepath)
+      // w stronie kodowej konsoli Windows i polskie znaki w nazwie się psują → „Otwórz plik" zawodzi.
+      '--encoding',
+      'UTF-8',
       '--ffmpeg-location',
       binariesDir(),
       '-P',
@@ -132,6 +137,15 @@ export class DownloadManager {
       `${PROGRESS_PREFIX}%(progress._percent_str)s;%(progress._speed_str)s;%(progress._eta_str)s`,
       '--no-playlist',
       '--no-simulate',
+      // Sanityzacja nazw: polskie znaki zachowane (BEZ --restrict-filenames),
+      // znaki zakazane na Windows usuwane z tytułu, długie nazwy przycinane (limit ścieżki).
+      '--windows-filenames',
+      '--trim-filenames',
+      '200',
+      '--replace-in-metadata',
+      'title',
+      '[/:*?"<>|]',
+      '',
       '--print',
       'after_move:filepath',
       req.url
