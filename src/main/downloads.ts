@@ -3,6 +3,8 @@ import { mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { app, type WebContents } from 'electron'
 import { binariesDir, ytDlpPath } from './binaries'
+import { detectSource } from './sources/detect'
+import { vimeoVideoSelector } from './sources/vimeo'
 import {
   IpcChannels,
   type DoneEvent,
@@ -136,13 +138,23 @@ export class DownloadManager {
     ]
 
     if (req.kind === 'video') {
-      const container = req.container ?? 'mp4'
+      const isVimeo = detectSource(req.url) === 'vimeo'
+      // Vimeo daje h264/aac → WEBM niemożliwy bez rekodowania, schodzimy do MP4.
+      const container = isVimeo && req.container === 'webm' ? 'mp4' : req.container ?? 'mp4'
       const label = req.qualityLabel?.replace(/[\\/:*?"<>|]/g, '')
+      // Vimeo używa własnego selektora (progresywne muxed); pozostałe źródła — dotychczasowy YT-owy.
+      const selector = isVimeo
+        ? vimeoVideoSelector(req.height)
+        : this.videoSelector(req.height, container)
+      // Vimeo bywa pojedynczym progresywnym plikiem → --merge-output-format jest wtedy ignorowany;
+      // --remux-video wymusza kontener (MKV) przez przepakowanie bez rekodowania (copy).
+      const remux = isVimeo ? ['--remux-video', container] : []
       return [
         '-f',
-        this.videoSelector(req.height, container),
+        selector,
         '--merge-output-format',
         container,
+        ...remux,
         '-o',
         label ? `%(title)s [${label}].%(ext)s` : '%(title)s [%(height)sp].%(ext)s',
         ...tail
