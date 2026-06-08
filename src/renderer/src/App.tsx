@@ -369,7 +369,7 @@ export default function App() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px 14px' }}>
         <div style={{ width: 30, height: 30, borderRadius: 9, background: C.red, display: 'grid', placeItems: 'center', color: '#fff' }}>{Ico.download(17)}</div>
         <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '.02em' }}>
-          <span style={{ color: C.text }}>YT</span><span style={{ color: C.red }}>-GRAB</span>
+          <span style={{ color: '#1ab7ea', fontStyle: 'italic', fontSize: 20, fontWeight: 900, marginRight: 1 }}>V</span><span style={{ color: C.text }}>YT</span><span style={{ color: C.red }}>-GRAB</span>
         </div>
         <span style={{ color: C.dim, fontSize: 12, fontFamily: MONO }}>v0.1.0</span>
         <span style={{ flex: 1 }} />
