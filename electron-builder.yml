@@ -1,0 +1,34 @@
+appId: pl.asmedia.vytgrab
+productName: VYT-GRAB
+
+directories:
+  output: release
+  buildResources: build
+
+# Kod aplikacji (electron-vite → out/). Zależności runtime (electron-store) są
+# bundlowane do out/main/index.js, więc node_modules nie trzeba pakować.
+files:
+  - out/**
+
+# Binarki yt-dlp/ffmpeg muszą być realnymi plikami na dysku (nie w asar).
+# Trafiają do resources/bin/<platforma> — zgodnie z binaries.ts (process.resourcesPath/bin/<platforma>).
+extraResources:
+  - from: bin
+    to: bin
+    filter:
+      - "**/*"
+
+asar: true
+npmRebuild: false
+
+win:
+  target:
+    - portable
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.utilities
