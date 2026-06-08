@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type {
   AudioFormat,
   BinaryStatus,
@@ -8,23 +8,25 @@ import type {
   VideoMeta
 } from '@shared/ipc'
 
-/* ── Paleta wyciągnięta z YT-GRAB (standalone).html ── */
-const C = {
-  bg: '#0a0b0d',
-  panel: '#0d0e11',
-  surface: '#15171b',
-  surface2: '#191c21',
-  border: '#23272e',
-  borderStrong: '#30353d',
-  text: '#e8eaed',
-  muted: '#939aa4',
-  dim: '#646b75',
-  red: '#ff0033',
-  green: '#34d27f',
-  blue: '#5aa9ff',
-  amber: '#e0a33e',
-  err: '#ff5a7a'
+/* ── Palety: ciemna (z YT-GRAB standalone.html) + jasna ── */
+interface Palette {
+  bg: string; panel: string; surface: string; surface2: string
+  border: string; borderStrong: string; text: string; muted: string
+  dim: string; red: string; green: string; blue: string; amber: string; err: string
 }
+const DARK: Palette = {
+  bg: '#0a0b0d', panel: '#0d0e11', surface: '#15171b', surface2: '#191c21',
+  border: '#23272e', borderStrong: '#30353d', text: '#e8eaed', muted: '#939aa4',
+  dim: '#646b75', red: '#ff0033', green: '#34d27f', blue: '#5aa9ff', amber: '#e0a33e', err: '#ff5a7a'
+}
+const LIGHT: Palette = {
+  bg: '#f4f5f7', panel: '#ffffff', surface: '#eef0f3', surface2: '#e3e7ec',
+  border: '#d7dbe2', borderStrong: '#c3c9d3', text: '#1b1e23', muted: '#586170',
+  dim: '#8a93a1', red: '#e60030', green: '#1f9d57', blue: '#2f6fd6', amber: '#9a6512', err: '#d6315b'
+}
+type ThemeName = 'dark' | 'light'
+const ThemeCtx = createContext<Palette>(DARK)
+const useC = (): Palette => useContext(ThemeCtx)
 const MONO = "'JetBrains Mono', ui-monospace, Consolas, monospace"
 
 /* ── Helpery ── */
@@ -95,6 +97,7 @@ function FormatTable({
   selected: string | null
   onSelect: (id: string) => void
 }) {
+  const C = useC()
   const isVideo = rows[0]?.kind === 'video'
   const th: CSSProperties = { textAlign: 'left', padding: '8px 10px', fontSize: 11, letterSpacing: '.04em', color: C.dim, fontWeight: 600, textTransform: 'uppercase' }
   return (
@@ -170,21 +173,21 @@ function FormatTable({
 }
 
 /* ── Karta zadania w kolejce ── */
-const STATUS = {
-  queued: { label: 'w kolejce', color: C.muted, bar: C.dim },
-  downloading: { label: 'pobieranie', color: C.amber, bar: C.amber },
-  done: { label: 'gotowe', color: C.green, bar: C.green },
-  error: { label: 'błąd', color: C.err, bar: C.err },
-  canceled: { label: 'anulowano', color: C.dim, bar: C.dim }
-} as const
-
 function QueueCard({ item, onRemove, onRetry }: { item: QueueItem; onRemove: (i: QueueItem) => void; onRetry: (i: QueueItem) => void }) {
+  const C = useC()
+  const STATUS = {
+    queued: { label: 'w kolejce', color: C.muted, bar: C.dim },
+    downloading: { label: 'pobieranie', color: C.amber, bar: C.amber },
+    done: { label: 'gotowe', color: C.green, bar: C.green },
+    error: { label: 'błąd', color: C.err, bar: C.err },
+    canceled: { label: 'anulowano', color: C.dim, bar: C.dim }
+  } as const
   const st = STATUS[item.status]
   const isErr = item.status === 'error'
   return (
     <li style={{
       listStyle: 'none', padding: 12, borderRadius: 10, background: C.surface,
-      border: `1px solid ${isErr ? '#3a2030' : C.border}`,
+      border: `1px solid ${isErr ? C.err : C.border}`,
       boxShadow: isErr ? `inset 3px 0 0 ${C.err}` : 'none'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -197,7 +200,7 @@ function QueueCard({ item, onRemove, onRetry }: { item: QueueItem; onRemove: (i:
       </div>
 
       {(item.status === 'downloading' || item.status === 'done') && (
-        <div style={{ height: 5, background: '#000', borderRadius: 3, overflow: 'hidden', marginTop: 10 }}>
+        <div style={{ height: 5, background: C.surface2, borderRadius: 3, overflow: 'hidden', marginTop: 10 }}>
           <div style={{ width: `${item.percent}%`, height: '100%', background: st.bar, transition: 'width .2s' }} />
         </div>
       )}
@@ -249,6 +252,19 @@ export default function App() {
 
   const [queue, setQueue] = useState<QueueItem[]>([])
   const startingRef = useRef(false)
+
+  // Motyw jasny/ciemny — preferencja czysto UI, zapamiętana w localStorage (bez IPC/main).
+  const [theme, setTheme] = useState<ThemeName>(() =>
+    typeof localStorage !== 'undefined' && localStorage.getItem('yt-grab-theme') === 'light' ? 'light' : 'dark'
+  )
+  const C = theme === 'light' ? LIGHT : DARK
+
+  useEffect(() => {
+    localStorage.setItem('yt-grab-theme', theme)
+    document.body.style.background = C.bg
+    document.body.style.color = C.text
+    document.documentElement.style.colorScheme = theme
+  }, [theme, C.bg, C.text])
 
   useEffect(() => {
     window.api.checkBinaries().then(setBins)
@@ -347,14 +363,23 @@ export default function App() {
   })
 
   return (
-    <div style={{ minHeight: '100vh', padding: 18, boxSizing: 'border-box' }}>
+    <ThemeCtx.Provider value={C}>
+    <div style={{ minHeight: '100vh', padding: 18, boxSizing: 'border-box', background: C.bg, color: C.text }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px 14px' }}>
         <div style={{ width: 30, height: 30, borderRadius: 9, background: C.red, display: 'grid', placeItems: 'center', color: '#fff' }}>{Ico.download(17)}</div>
         <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '.02em' }}>
-          <span style={{ color: '#fff' }}>YT</span><span style={{ color: C.red }}>-GRAB</span>
+          <span style={{ color: C.text }}>YT</span><span style={{ color: C.red }}>-GRAB</span>
         </div>
         <span style={{ color: C.dim, fontSize: 12, fontFamily: MONO }}>v0.1.0</span>
+        <span style={{ flex: 1 }} />
+        <button
+          onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+          title="Przełącz motyw jasny/ciemny"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+        >
+          {theme === 'dark' ? '☀ Jasny' : '☾ Ciemny'}
+        </button>
       </div>
 
       {/* URL bar */}
@@ -380,7 +405,7 @@ export default function App() {
       </div>
 
       {error && (
-        <div style={{ marginTop: 14, padding: '11px 14px', borderRadius: 10, background: '#211519', border: '1px solid #3a2030', color: C.err, whiteSpace: 'pre-wrap', fontSize: 13 }}>{error}</div>
+        <div style={{ marginTop: 14, padding: '11px 14px', borderRadius: 10, background: C.surface, border: `1px solid ${C.err}`, color: C.err, whiteSpace: 'pre-wrap', fontSize: 13 }}>{error}</div>
       )}
 
       {/* Układ jednokolumnowy: główny obszar, a pod nim kolejka na pełną szerokość */}
@@ -437,7 +462,7 @@ export default function App() {
               </div>
 
               {vimeoWebmFallback && (
-                <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 9, background: '#2a2417', border: '1px solid #4a3d1e', color: C.amber, fontSize: 12 }}>
+                <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 9, background: C.surface, border: `1px solid ${C.amber}`, color: C.amber, fontSize: 12 }}>
                   Vimeo udostępnia wideo w H.264/AAC — WEBM wymagałby rekodowania, więc plik zostanie zapisany jako <b>MP4</b>.
                 </div>
               )}
@@ -488,5 +513,6 @@ export default function App() {
         {bins === null ? 'binarki: …' : bins.map((b) => `${b.name} ${b.found && b.version ? '✓' : '✗'}`).join('  ·  ')}
       </div>
     </div>
+    </ThemeCtx.Provider>
   )
 }
