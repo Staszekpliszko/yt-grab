@@ -301,7 +301,8 @@ export default function App() {
     const sel = meta.formats.find((f) => f.formatId === selected)
     if (mode === 'video') {
       if (!sel || sel.kind !== 'video') return
-      const m = `${sel.qualityLabel ?? sel.resolution ?? '?'} · ${container.toUpperCase()}`
+      const effContainer = isVimeo && container === 'webm' ? 'mp4' : container
+      const m = `${sel.qualityLabel ?? sel.resolution ?? '?'} · ${effContainer.toUpperCase()}`
       addItem(m, { kind: 'video', url: meta.url, height: sel.height, qualityLabel: sel.qualityLabel, container, outputDir })
     } else {
       addItem(`${audioFormat.toUpperCase()} · best audio`, { kind: 'audio', url: meta.url, audioFormat, outputDir })
@@ -328,6 +329,9 @@ export default function App() {
 
   const rows = meta ? meta.formats.filter((f) => f.kind === mode) : []
   const selectedFmt = meta?.formats.find((f) => f.formatId === selected)
+  // Vimeo serwuje H.264/AAC → WEBM wymagałby rekodowania; pokazujemy MP4 i informujemy.
+  const isVimeo = /vimeo\.com/i.test(meta?.url ?? '')
+  const vimeoWebmFallback = isVimeo && mode === 'video' && container === 'webm'
   const doneCount = queue.filter((i) => i.status === 'done').length
   const btnSize = mode === 'video' ? formatSize(selectedFmt?.filesize) : ''
 
@@ -361,7 +365,7 @@ export default function App() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && analyze()}
-            placeholder="Wklej adres URL filmu z YouTube…"
+            placeholder="Wklej adres URL filmu z YouTube lub Vimeo…"
             style={{ flex: 1, padding: '13px 0', border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 14 }}
           />
           {url && <button onClick={() => setUrl('')} style={{ border: 'none', background: 'transparent', color: C.dim, cursor: 'pointer', fontSize: 16 }}>✕</button>}
@@ -379,16 +383,16 @@ export default function App() {
         <div style={{ marginTop: 14, padding: '11px 14px', borderRadius: 10, background: '#211519', border: '1px solid #3a2030', color: C.err, whiteSpace: 'pre-wrap', fontSize: 13 }}>{error}</div>
       )}
 
-      {/* Dwie kolumny */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 16, marginTop: 16, alignItems: 'start' }}>
-        {/* Lewa: główny obszar */}
+      {/* Układ jednokolumnowy: główny obszar, a pod nim kolejka na pełną szerokość */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+        {/* Główny obszar */}
         <div style={{ ...card, padding: 16, minHeight: 420 }}>
           {!meta ? (
             <div style={{ height: 420, display: 'grid', placeItems: 'center', textAlign: 'center', color: C.muted }}>
               <div>
                 <div style={{ width: 56, height: 56, borderRadius: 14, background: C.surface, display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: C.muted }}>{Ico.search(24)}</div>
                 <div style={{ color: C.text, fontWeight: 700, fontSize: 15 }}>Brak wczytanego filmu</div>
-                <div style={{ fontSize: 13, marginTop: 6, maxWidth: 320 }}>Wklej adres URL z YouTube powyżej i kliknij „Analizuj", aby pobrać listę dostępnych formatów.</div>
+                <div style={{ fontSize: 13, marginTop: 6, maxWidth: 320 }}>Wklej adres URL z YouTube lub Vimeo powyżej i kliknij „Analizuj", aby pobrać listę dostępnych formatów.</div>
               </div>
             </div>
           ) : (
@@ -432,6 +436,12 @@ export default function App() {
                 </div>
               </div>
 
+              {vimeoWebmFallback && (
+                <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 9, background: '#2a2417', border: '1px solid #4a3d1e', color: C.amber, fontSize: 12 }}>
+                  Vimeo udostępnia wideo w H.264/AAC — WEBM wymagałby rekodowania, więc plik zostanie zapisany jako <b>MP4</b>.
+                </div>
+              )}
+
               {/* Folder */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, padding: '10px 12px', background: C.surface, borderRadius: 10 }}>
                 <span style={{ color: C.dim }}>{Ico.folder(16)}</span>
@@ -451,8 +461,8 @@ export default function App() {
           )}
         </div>
 
-        {/* Prawa: kolejka */}
-        <div style={{ ...card, padding: 14, minHeight: 420 }}>
+        {/* Kolejka — pełna szerokość pod przyciskiem Pobierz */}
+        <div style={{ ...card, padding: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: C.red }}>{Ico.download(16)}</span>
             <span style={{ fontWeight: 700, fontSize: 14 }}>Kolejka pobierań</span>
@@ -462,14 +472,12 @@ export default function App() {
           </div>
 
           {queue.length === 0 ? (
-            <div style={{ height: 360, display: 'grid', placeItems: 'center', textAlign: 'center', color: C.muted }}>
-              <div>
-                <div style={{ width: 48, height: 48, borderRadius: 12, border: `1px solid ${C.border}`, display: 'grid', placeItems: 'center', margin: '0 auto 12px', color: C.dim }}>{Ico.download(20)}</div>
-                <div style={{ fontSize: 13 }}>Brak zadań. Wybierz format<br />i kliknij <b style={{ color: C.text }}>Pobierz</b>.</div>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '20px 0', textAlign: 'center', color: C.muted, fontSize: 13 }}>
+              <span style={{ color: C.dim }}>{Ico.download(18)}</span>
+              <span>Brak zadań. Wybierz format i kliknij <b style={{ color: C.text }}>Pobierz</b>.</span>
             </div>
           ) : (
-            <ul style={{ display: 'grid', gap: 8, padding: 0, margin: '12px 0 0' }}>
+            <ul style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10, padding: 0, margin: '12px 0 0' }}>
               {queue.map((i) => <QueueCard key={i.id} item={i} onRemove={removeItem} onRetry={retryItem} />)}
             </ul>
           )}
