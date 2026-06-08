@@ -1,9 +1,11 @@
 import { spawn } from 'child_process'
 import { ytDlpPath } from './binaries'
 import type { FormatInfo, VideoMeta } from '@shared/ipc'
+import { detectSource } from './sources/detect'
+import { vimeoToVideoMeta } from './sources/vimeo'
 
 /** Podzbiór pól z `yt-dlp -J`, których faktycznie używamy. */
-interface RawFormat {
+export interface RawFormat {
   format_id: string
   ext: string
   vcodec?: string | null
@@ -18,7 +20,7 @@ interface RawFormat {
   protocol?: string | null
 }
 
-interface RawInfo {
+export interface RawInfo {
   title?: string
   duration?: number
   thumbnail?: string
@@ -64,6 +66,8 @@ export class YtDlpService {
   /** Analizuje pojedynczy film i zwraca listę formatów dla UI. */
   async analyze(url: string): Promise<VideoMeta> {
     const info = await this.runJson(url)
+    // Vimeo ma odmienny układ formatów → osobny, odizolowany maper. Ścieżka YT bez zmian.
+    if (detectSource(url) === 'vimeo') return vimeoToVideoMeta(url, info)
     return this.toVideoMeta(url, info)
   }
 
