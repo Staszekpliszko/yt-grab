@@ -21,7 +21,11 @@ export const IpcChannels = {
   /** Etap 7: odczyt folderu docelowego (lastOutputDir lub Pobrane). */
   outputDirGet: 'dir:get',
   /** Etap 7: natywny dialog wyboru folderu (zapis do electron-store). */
-  outputDirPick: 'dir:pick'
+  outputDirPick: 'dir:pick',
+  /** Otwiera pobrany plik w domyślnej aplikacji. */
+  fileOpen: 'file:open',
+  /** Pokazuje pobrany plik w eksploratorze (zaznaczony). */
+  fileReveal: 'file:reveal'
 } as const
 
 /** Status pojedynczej binarki (yt-dlp / ffmpeg / ffprobe). */
@@ -39,6 +43,10 @@ export interface FormatInfo {
   kind: 'video' | 'audio'
   ext: string
   resolution?: string
+  /** Etykieta jakości wg YouTube (np. „2160p") — dla filmów nie-16:9 różna od height. */
+  qualityLabel?: string
+  /** Znacznik typu jakości: „8K" / „4K" / „HD". */
+  qualityTag?: string
   height?: number
   fps?: number
   vcodec?: string
@@ -66,8 +74,10 @@ export interface DownloadRequest {
   kind: DownloadKind
   url: string
   outputDir: string
-  /** kind === 'video': wybrany format wideo + auto best audio. */
-  formatId?: string
+  /** kind === 'video': docelowa wysokość strumienia (selektor) + auto best audio. */
+  height?: number
+  /** kind === 'video': etykieta jakości do nazwy pliku (np. „2160p"). */
+  qualityLabel?: string
   container?: VideoContainer
   /** kind === 'audio': format docelowy. */
   audioFormat?: AudioFormat
@@ -99,6 +109,10 @@ export interface Api {
   getOutputDir: () => Promise<string>
   /** Otwiera dialog wyboru folderu; zwraca wybraną ścieżkę lub null (anulowano). */
   pickOutputDir: () => Promise<string | null>
+  /** Otwiera pobrany plik w domyślnej aplikacji. */
+  openFile: (path: string) => Promise<void>
+  /** Pokazuje pobrany plik w eksploratorze (zaznaczony). */
+  revealFile: (path: string) => Promise<void>
   /** Startuje pobranie i zwraca jobId. Postęp/koniec/błąd przez onProgress/onDone/onError. */
   startDownload: (req: DownloadRequest) => Promise<string>
   cancelDownload: (jobId: string) => Promise<void>

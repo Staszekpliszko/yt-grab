@@ -10,6 +10,17 @@
 (puste)
 
 ## Zrobione
+- [x] Poprawki UX/jakości (po testach użytkownika)
+      • Etykiety jakości wg YouTube (format_note) — filmy nie-16:9 pokazują 2160p/1440p
+        zamiast surowej wysokości (1620p/1080p); znacznik 4K/HD.
+      • Lista jakości: JEDEN wiersz na jakość (grupowanie po etykiecie), bez 3 kodeków
+        i bez kolumny „Typ" — każdy wiersz = wideo+audio po merge (koniec „bez audio").
+      • Pobieranie wideo selektorem po wysokości+kontenerze: MP4 preferuje av01/avc1 + m4a
+        → 4K MP4 ZAWSZE z dźwiękiem (wcześniej VP9+Opus w MP4 = niemy plik).
+      • Pominięcie strumieni HLS (m3u8) w analizie.
+      • Po pobraniu przyciski „Otwórz plik" (shell.openPath) i „Otwórz folder"
+        (shell.showItemInFolder); kanały IPC file:open / file:reveal.
+      Bramka: typecheck ✅ · lint ✅ · build ✅ · symulacja selektora MP4 4K → 401+140 (av01+AAC) ✅
 - [x] Etap 1 — Skeleton Electron+Vite+React+TS, IPC echo, toolchain (typecheck/lint/build)
       Bramka: typecheck ✅ · lint ✅ (--max-warnings 0) · build ✅ · renderer bez Node API ✅ ·
       okno startuje ✅ · echo „echo: ping" potwierdzone w UI ✅

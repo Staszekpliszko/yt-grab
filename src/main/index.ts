@@ -63,6 +63,9 @@ function registerIpc(): void {
     setOutputDir(dir)
     return dir
   })
+  // Otwarcie pobranego pliku w domyślnej aplikacji / pokazanie w eksploratorze.
+  ipcMain.handle(IpcChannels.fileOpen, (_event, path: string) => shell.openPath(path))
+  ipcMain.handle(IpcChannels.fileReveal, (_event, path: string) => shell.showItemInFolder(path))
 }
 
 app.whenReady().then(() => {

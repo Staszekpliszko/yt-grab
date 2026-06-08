@@ -14,6 +14,8 @@ interface RawFormat {
   filesize?: number | null
   filesize_approx?: number | null
   resolution?: string | null
+  format_note?: string | null
+  protocol?: string | null
 }
 
 interface RawInfo {
@@ -36,6 +38,26 @@ function dedupBy(list: FormatInfo[], key: (f: FormatInfo) => string): FormatInfo
     out.push(f)
   }
   return out
+}
+
+/**
+ * Etykieta jakości wg YouTube (np. „2160p", „1080p60") — kluczowe dla filmów
+ * nie-16:9, gdzie height (np. 1620) różni się od nazwy YT (2160p).
+ */
+function qualityLabelOf(note?: string | null, height?: number | null): string {
+  const m = note?.match(/^\d{2,4}p\d*/)
+  if (m) return m[0]
+  return height ? `${height}p` : '—'
+}
+
+/** „8K" / „4K" / „HD" na podstawie liczby z etykiety jakości. */
+function qualityTagOf(label: string): string | undefined {
+  const n = parseInt(label, 10)
+  if (!n) return undefined
+  if (n >= 4320) return '8K'
+  if (n >= 2160) return '4K'
+  if (n >= 1080) return 'HD'
+  return undefined
 }
 
 export class YtDlpService {
@@ -75,43 +97,78 @@ export class YtDlpService {
 
   private toVideoMeta(url: string, info: RawInfo): VideoMeta {
     const raw = info.formats ?? []
-    const videos: FormatInfo[] = []
+    const rawVideos: RawFormat[] = []
     const audios: FormatInfo[] = []
 
     for (const f of raw) {
+      // Pomijamy strumienie HLS (m3u8) — to duplikaty DASH-a, zaśmiecają listę.
+      if ((f.protocol ?? '').includes('m3u8')) continue
+
       const hasVideo = !!f.vcodec && f.vcodec !== 'none'
       const hasAudio = !!f.acodec && f.acodec !== 'none'
-      if (!hasVideo && !hasAudio) continue // storyboardy / nie-media — to nie są ścieżki do pobrania
+      if (!hasVideo && !hasAudio) continue // storyboardy / nie-media
 
-      const fi: FormatInfo = {
-        formatId: f.format_id,
-        kind: hasVideo ? 'video' : 'audio',
-        ext: f.ext,
-        resolution: hasVideo ? (f.height ? `${f.height}p` : f.resolution ?? undefined) : undefined,
-        height: hasVideo ? f.height ?? undefined : undefined,
-        fps: f.fps ?? undefined,
-        vcodec: hasVideo ? f.vcodec ?? undefined : undefined,
-        acodec: hasAudio ? f.acodec ?? undefined : undefined,
-        hasAudio,
-        tbr: f.tbr ?? undefined,
-        filesize: f.filesize ?? f.filesize_approx ?? undefined
+      if (hasVideo) {
+        rawVideos.push(f)
+      } else {
+        audios.push({
+          formatId: f.format_id,
+          kind: 'audio',
+          ext: f.ext,
+          acodec: f.acodec ?? undefined,
+          hasAudio: true,
+          tbr: f.tbr ?? undefined,
+          filesize: f.filesize ?? f.filesize_approx ?? undefined
+        })
       }
-
-      if (hasVideo) videos.push(fi)
-      else audios.push(fi)
     }
 
-    // Sort: wideo po rozdzielczości → fps → bitrate (malejąco); audio po bitrate.
-    videos.sort(
-      (a, b) =>
-        (b.height ?? 0) - (a.height ?? 0) ||
-        (b.fps ?? 0) - (a.fps ?? 0) ||
-        (b.tbr ?? 0) - (a.tbr ?? 0)
-    )
-    audios.sort((a, b) => (b.tbr ?? 0) - (a.tbr ?? 0))
+    // Najlepsze audio (do oszacowania rozmiaru „wideo+audio" w wierszu jakości).
+    const sizeOf = (f: RawFormat) => f.filesize ?? f.filesize_approx ?? 0
+    const bestAudioSize = audios.reduce((mx, a) => Math.max(mx, a.filesize ?? 0), 0)
 
-    // Dedup: wideo po (height, kodek, fps); audio po (kodek, bitrate).
-    const uniqueVideos = dedupBy(videos, (v) => `${v.height}|${codecBase(v.vcodec)}|${v.fps ?? ''}`)
+    // Grupowanie wideo po etykiecie jakości → JEDEN wiersz na jakość (każdy = wideo+audio po merge).
+    const groups = new Map<string, RawFormat[]>()
+    for (const f of rawVideos) {
+      const label = qualityLabelOf(f.format_note, f.height)
+      const g = groups.get(label)
+      if (g) g.push(f)
+      else groups.set(label, [f])
+    }
+
+    const codecRank: Record<string, number> = { av01: 0, avc1: 1, vp9: 2 }
+    const videos: FormatInfo[] = []
+    for (const [label, list] of groups) {
+      // Reprezentant: najmniejszy rozmiar wideo (zwykle AV1) — taki realnie pobierzemy.
+      const minVideoSize = list.reduce(
+        (mn, f) => (sizeOf(f) > 0 && sizeOf(f) < mn ? sizeOf(f) : mn),
+        Infinity
+      )
+      const rep = [...list].sort(
+        (a, b) =>
+          (codecRank[codecBase(a.vcodec ?? undefined)] ?? 9) -
+          (codecRank[codecBase(b.vcodec ?? undefined)] ?? 9)
+      )[0]
+      const height = list.reduce((mx, f) => Math.max(mx, f.height ?? 0), 0)
+      const total = (minVideoSize === Infinity ? 0 : minVideoSize) + bestAudioSize
+
+      videos.push({
+        formatId: rep.format_id,
+        kind: 'video',
+        ext: rep.ext,
+        resolution: label,
+        qualityLabel: label,
+        qualityTag: qualityTagOf(label),
+        height: height || undefined,
+        fps: rep.fps ?? undefined,
+        vcodec: rep.vcodec ?? undefined,
+        hasAudio: true, // po merge zawsze z dźwiękiem
+        filesize: total || undefined
+      })
+    }
+
+    videos.sort((a, b) => (b.height ?? 0) - (a.height ?? 0) || (b.fps ?? 0) - (a.fps ?? 0))
+    audios.sort((a, b) => (b.tbr ?? 0) - (a.tbr ?? 0))
     const uniqueAudios = dedupBy(audios, (a) => `${codecBase(a.acodec)}|${Math.round(a.tbr ?? 0)}`)
 
     return {
@@ -119,7 +176,7 @@ export class YtDlpService {
       title: info.title ?? 'Bez tytułu',
       durationSec: info.duration ?? 0,
       thumbnail: info.thumbnail,
-      formats: [...uniqueVideos, ...uniqueAudios]
+      formats: [...videos, ...uniqueAudios]
     }
   }
 }

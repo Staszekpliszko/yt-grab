@@ -136,13 +136,15 @@ export class DownloadManager {
     ]
 
     if (req.kind === 'video') {
+      const container = req.container ?? 'mp4'
+      const label = req.qualityLabel?.replace(/[\\/:*?"<>|]/g, '')
       return [
         '-f',
-        `${req.formatId}+ba/${req.formatId}`,
+        this.videoSelector(req.height, container),
         '--merge-output-format',
-        req.container ?? 'mp4',
+        container,
         '-o',
-        '%(title)s [%(height)sp].%(ext)s',
+        label ? `%(title)s [${label}].%(ext)s` : '%(title)s [%(height)sp].%(ext)s',
         ...tail
       ]
     }
@@ -159,6 +161,23 @@ export class DownloadManager {
       '%(title)s.%(ext)s',
       ...tail
     ]
+  }
+
+  /**
+   * Selektor formatu wideo po wysokości i kontenerze. Zawsze dokleja `+ba`
+   * (best audio) → plik wynikowy MA dźwięk. Dla MP4 preferujemy kodek
+   * mp4-natywny (av01/avc1) + audio m4a, by uniknąć „niemego" VP9/Opus w MP4.
+   */
+  private videoSelector(height: number | undefined, container: string): string {
+    if (!height) return 'bv*+ba/b'
+    const h = `[height>=${height}][height<=${height}]`
+    if (container === 'mp4') {
+      return `bv*${h}[vcodec~='^(avc1|av01)']+ba[ext=m4a]/bv*${h}+ba/b${h}/bv*+ba/b`
+    }
+    if (container === 'webm') {
+      return `bv*${h}[vcodec~='^(vp9|av01)']+ba/bv*${h}+ba/b${h}/bv*+ba/b`
+    }
+    return `bv*${h}+ba/b${h}/bv*+ba/b`
   }
 
   private parseProgress(jobId: string, line: string): ProgressEvent {

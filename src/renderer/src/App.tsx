@@ -41,10 +41,6 @@ function formatDuration(sec: number): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
 }
-const VIDEO_CODECS: Record<string, string> = {
-  avc1: 'H.264', avc3: 'H.264', h264: 'H.264', hev1: 'H.265', hvc1: 'H.265',
-  vp9: 'VP9', vp09: 'VP9', vp8: 'VP8', av01: 'AV1', av1: 'AV1'
-}
 const AUDIO_CODECS: Record<string, string> = {
   mp4a: 'AAC', aac: 'AAC', opus: 'Opus', vorbis: 'Vorbis',
   mp3: 'MP3', 'ac-3': 'AC3', 'ec-3': 'E-AC3', flac: 'FLAC', dts: 'DTS'
@@ -107,11 +103,20 @@ function FormatTable({
         <thead>
           <tr style={{ background: C.surface }}>
             <th style={{ ...th, width: 34 }}></th>
-            <th style={th}>{isVideo ? 'Rozdzielczość' : 'Kodek'}</th>
-            <th style={th}>{isVideo ? 'FPS' : 'Bitrate'}</th>
-            <th style={th}>{isVideo ? 'Kodek' : 'Format'}</th>
-            <th style={th}>Rozmiar</th>
-            {isVideo && <th style={th}>Typ</th>}
+            {isVideo ? (
+              <>
+                <th style={th}>Jakość</th>
+                <th style={th}>FPS</th>
+                <th style={th}>Rozmiar</th>
+              </>
+            ) : (
+              <>
+                <th style={th}>Kodek</th>
+                <th style={th}>Bitrate</th>
+                <th style={th}>Format</th>
+                <th style={th}>Rozmiar</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -136,18 +141,16 @@ function FormatTable({
                 {isVideo ? (
                   <>
                     <td style={{ ...td, fontWeight: 600 }}>
-                      {f.resolution ?? '—'}
-                      {f.fps && f.fps >= 48 && <sup style={{ color: C.red, fontSize: 10, marginLeft: 3 }}>{f.fps}</sup>}
-                    </td>
-                    <td style={{ ...td, color: C.muted, fontFamily: MONO }}>{f.fps ?? '—'}</td>
-                    <td style={{ ...td, color: C.muted, fontFamily: MONO }} title={f.vcodec}>{prettyCodec(f.vcodec, VIDEO_CODECS)}</td>
-                    <td style={{ ...td, fontFamily: MONO }}>{formatSize(f.filesize)}</td>
-                    <td style={td}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: f.hasAudio ? C.green : C.muted, fontSize: 12 }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: f.hasAudio ? C.green : C.dim }} />
-                        {f.hasAudio ? 'wideo+audio' : 'wideo'}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        {f.qualityLabel ?? f.resolution ?? '—'}
+                        {f.qualityTag && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: C.red, border: `1px solid ${C.red}`, borderRadius: 4, padding: '0 4px', letterSpacing: '.03em' }}>{f.qualityTag}</span>
+                        )}
+                        {f.fps && f.fps >= 48 && <sup style={{ color: C.red, fontSize: 10 }}>{f.fps}</sup>}
                       </span>
                     </td>
+                    <td style={{ ...td, color: C.muted, fontFamily: MONO }}>{f.fps ?? '—'}</td>
+                    <td style={{ ...td, fontFamily: MONO }}>{formatSize(f.filesize)}</td>
                   </>
                 ) : (
                   <>
@@ -212,7 +215,19 @@ function QueueCard({ item, onRemove, onRetry }: { item: QueueItem; onRemove: (i:
         )}
       </div>
       {item.status === 'done' && item.filePath && (
-        <div style={{ fontSize: 10, color: C.dim, marginTop: 4, wordBreak: 'break-all', fontFamily: MONO }}>{item.filePath}</div>
+        <>
+          <div style={{ fontSize: 10, color: C.dim, marginTop: 4, wordBreak: 'break-all', fontFamily: MONO }}>{item.filePath}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={() => window.api.openFile(item.filePath!)}
+              style={{ flex: 1, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface2, color: C.text, cursor: 'pointer' }}>
+              ▶ Otwórz plik
+            </button>
+            <button onClick={() => window.api.revealFile(item.filePath!)}
+              style={{ flex: 1, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface2, color: C.text, cursor: 'pointer' }}>
+              📁 Otwórz folder
+            </button>
+          </div>
+        </>
       )}
     </li>
   )
@@ -286,8 +301,8 @@ export default function App() {
     const sel = meta.formats.find((f) => f.formatId === selected)
     if (mode === 'video') {
       if (!sel || sel.kind !== 'video') return
-      const m = `${sel.resolution ?? '?'} · ${container.toUpperCase()} · ${prettyCodec(sel.vcodec, VIDEO_CODECS)}`
-      addItem(m, { kind: 'video', url: meta.url, formatId: sel.formatId, container, outputDir })
+      const m = `${sel.qualityLabel ?? sel.resolution ?? '?'} · ${container.toUpperCase()}`
+      addItem(m, { kind: 'video', url: meta.url, height: sel.height, qualityLabel: sel.qualityLabel, container, outputDir })
     } else {
       addItem(`${audioFormat.toUpperCase()} · best audio`, { kind: 'audio', url: meta.url, audioFormat, outputDir })
     }
