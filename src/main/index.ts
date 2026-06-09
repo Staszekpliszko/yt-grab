@@ -3,10 +3,12 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { IpcChannels, type DownloadRequest } from '@shared/ipc'
 import { checkBinaries } from './binaries'
 import { YtDlpService } from './ytdlp'
+import { PlaylistService } from './playlist'
 import { DownloadManager } from './downloads'
 import { getOutputDir, setOutputDir } from './store'
 
 const ytDlp = new YtDlpService()
+const playlist = new PlaylistService()
 const downloads = new DownloadManager()
 
 // Ikona okna (i taskbara w dev). W paczce na Windows/macOS finalną ikonę aplikacji
@@ -57,6 +59,8 @@ function registerIpc(): void {
   ipcMain.handle(IpcChannels.binariesCheck, () => checkBinaries())
   // Etap 3: analiza filmu (yt-dlp -J → lista formatów).
   ipcMain.handle(IpcChannels.videoAnalyze, (_event, url: string) => ytDlp.analyze(url))
+  // Playlisty: szybka analiza listy (--flat-playlist → wpisy bez formatów).
+  ipcMain.handle(IpcChannels.playlistAnalyze, (_event, url: string) => playlist.analyze(url))
   // Etap 6: start/anulowanie pobierania (postęp przez eventy download:progress/done/error).
   ipcMain.handle(IpcChannels.downloadStart, (event, req: DownloadRequest) => downloads.start(req, event.sender))
   ipcMain.handle(IpcChannels.downloadCancel, (_event, jobId: string) => downloads.cancel(jobId))

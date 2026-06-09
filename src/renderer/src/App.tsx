@@ -7,6 +7,8 @@ import type {
   VideoContainer,
   VideoMeta
 } from '@shared/ipc'
+import { hasPlaylistUrl } from '@shared/ipc'
+import { PlaylistFlow, type NewQueueItem } from './Playlist'
 
 /* ── Palety: ciemna (z YT-GRAB standalone.html) + jasna ── */
 interface Palette {
@@ -26,8 +28,8 @@ const LIGHT: Palette = {
 }
 type ThemeName = 'dark' | 'light'
 const ThemeCtx = createContext<Palette>(DARK)
-const useC = (): Palette => useContext(ThemeCtx)
-const MONO = "'JetBrains Mono', ui-monospace, Consolas, monospace"
+export const useC = (): Palette => useContext(ThemeCtx)
+export const MONO = "'JetBrains Mono', ui-monospace, Consolas, monospace"
 
 /* ── Helpery ── */
 function formatSize(bytes?: number): string {
@@ -35,7 +37,7 @@ function formatSize(bytes?: number): string {
   const mb = bytes / (1024 * 1024)
   return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(0)} MB`
 }
-function formatDuration(sec: number): string {
+export function formatDuration(sec: number): string {
   if (!sec) return '—'
   const h = Math.floor(sec / 3600)
   const m = Math.floor((sec % 3600) / 60)
@@ -88,7 +90,7 @@ interface QueueItem {
 }
 
 /* ── Tabela formatów ── */
-function FormatTable({
+export function FormatTable({
   rows,
   selected,
   onSelect
@@ -253,6 +255,9 @@ export default function App() {
   const [queue, setQueue] = useState<QueueItem[]>([])
   const startingRef = useRef(false)
 
+  // Gdy ustawiony → otwarty modal obsługi playlisty (zakres → metoda → profil/stepper).
+  const [playlistUrl, setPlaylistUrl] = useState<string | null>(null)
+
   // Motyw jasny/ciemny — preferencja czysto UI, zapamiętana w localStorage (bez IPC/main).
   const [theme, setTheme] = useState<ThemeName>(() =>
     typeof localStorage !== 'undefined' && localStorage.getItem('yt-grab-theme') === 'light' ? 'light' : 'dark'
@@ -287,11 +292,21 @@ export default function App() {
       .finally(() => { startingRef.current = false })
   }, [queue])
 
-  async function analyze() {
-    if (!url.trim()) return
+  function analyze() {
+    const u = url.trim()
+    if (!u) return
+    // Link z playlistą (list=…) → najpierw zapytaj o zakres (modal), nie analizuj od razu.
+    if (hasPlaylistUrl(u)) {
+      setPlaylistUrl(u)
+      return
+    }
+    analyzeSingle(u)
+  }
+
+  async function analyzeSingle(u: string) {
     setAnalyzing(true); setError(null); setMeta(null); setSelected(null)
     try {
-      const r = await window.api.analyze(url.trim())
+      const r = await window.api.analyze(u)
       setMeta(r)
       setSelected(r.formats.find((f) => f.kind === 'video')?.formatId ?? r.formats[0]?.formatId ?? null)
       setMode('video')
@@ -300,6 +315,22 @@ export default function App() {
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  // Dodaje wiele pozycji do kolejki naraz (playlista). Sterownik kolejki pobiera je sekwencyjnie.
+  function enqueueMany(items: NewQueueItem[]) {
+    const base = Date.now()
+    setQueue((q) => [
+      ...q,
+      ...items.map((it, i) => ({
+        id: `q-${base}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        title: it.title,
+        meta: it.meta,
+        request: it.request,
+        status: 'queued' as QueueStatus,
+        percent: 0
+      }))
+    ])
   }
 
   function switchMode(m: 'video' | 'audio') {
@@ -364,6 +395,15 @@ export default function App() {
 
   return (
     <ThemeCtx.Provider value={C}>
+    {playlistUrl && (
+      <PlaylistFlow
+        plUrl={playlistUrl}
+        outputDir={outputDir}
+        onSingleVideo={() => { const u = playlistUrl; setPlaylistUrl(null); analyzeSingle(u) }}
+        onEnqueue={enqueueMany}
+        onClose={() => setPlaylistUrl(null)}
+      />
+    )}
     <div style={{ minHeight: '100vh', padding: 18, boxSizing: 'border-box', background: C.bg, color: C.text }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px 14px' }}>

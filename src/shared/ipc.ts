@@ -8,6 +8,8 @@ export const IpcChannels = {
   binariesCheck: 'binaries:check',
   /** Etap 3: analiza filmu (yt-dlp -J → lista formatów). */
   videoAnalyze: 'video:analyze',
+  /** Playlisty: szybka analiza listy (yt-dlp --flat-playlist → wpisy bez formatów). */
+  playlistAnalyze: 'playlist:analyze',
   /** Etap 6: start pobierania (zwraca jobId; postęp/koniec przez eventy). */
   downloadStart: 'download:start',
   /** Etap 6: anulowanie pobierania. */
@@ -65,6 +67,33 @@ export interface VideoMeta {
   formats: FormatInfo[]
 }
 
+/** Jeden wpis playlisty (z --flat-playlist, bez listy formatów). */
+export interface PlaylistEntry {
+  id: string
+  url: string
+  title: string
+  durationSec: number
+}
+
+/** Wynik szybkiej analizy playlisty. */
+export interface PlaylistMeta {
+  url: string
+  title: string
+  entries: PlaylistEntry[]
+}
+
+/**
+ * Czy URL zawiera playlistę (parametr `list=`). Czysta funkcja bez zależności
+ * node — używana też w rendererze do decyzji „pytać o zakres czy nie".
+ * Pomijamy automiksy YT (list=RD…/UL…/RDMM…), bo to nieskończone radio, nie lista.
+ */
+export function hasPlaylistUrl(url: string): boolean {
+  const m = url.match(/[?&]list=([^&]+)/)
+  if (!m) return false
+  const id = decodeURIComponent(m[1])
+  return !/^(RD|UL|RDMM|RDCLAK)/.test(id)
+}
+
 export type VideoContainer = 'mp4' | 'mkv' | 'webm'
 export type AudioFormat = 'mp3' | 'm4a' | 'opus' | 'wav'
 export type DownloadKind = 'video' | 'audio'
@@ -105,6 +134,8 @@ export interface Api {
   echo: (message: string) => Promise<string>
   checkBinaries: () => Promise<BinaryStatus[]>
   analyze: (url: string) => Promise<VideoMeta>
+  /** Szybka analiza playlisty (wpisy bez formatów). */
+  analyzePlaylist: (url: string) => Promise<PlaylistMeta>
   /** Zwraca aktualny folder docelowy (zapamiętany lub Pobrane). */
   getOutputDir: () => Promise<string>
   /** Otwiera dialog wyboru folderu; zwraca wybraną ścieżkę lub null (anulowano). */

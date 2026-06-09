@@ -18,6 +18,7 @@ const api: Api = {
   echo: (message: string) => ipcRenderer.invoke(IpcChannels.echo, message),
   checkBinaries: () => ipcRenderer.invoke(IpcChannels.binariesCheck),
   analyze: (url: string) => ipcRenderer.invoke(IpcChannels.videoAnalyze, url),
+  analyzePlaylist: (url: string) => ipcRenderer.invoke(IpcChannels.playlistAnalyze, url),
   getOutputDir: () => ipcRenderer.invoke(IpcChannels.outputDirGet),
   pickOutputDir: () => ipcRenderer.invoke(IpcChannels.outputDirPick),
   openFile: (path) => ipcRenderer.invoke(IpcChannels.fileOpen, path),
