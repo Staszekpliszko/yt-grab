@@ -373,6 +373,12 @@ export default function App() {
         </div>
         <span style={{ color: C.dim, fontSize: 12, fontFamily: MONO }}>v0.1.0</span>
         <span style={{ flex: 1 }} />
+        <img
+          src="./logo.png"
+          alt="A.S. LIVE MEDIA"
+          title="A.S. LIVE MEDIA"
+          style={{ height: 34, width: 'auto', borderRadius: 8, background: '#fff', padding: '3px 8px', boxShadow: `0 0 0 1px ${C.border}` }}
+        />
         <button
           onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
           title="Przełącz motyw jasny/ciemny"

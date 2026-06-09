@@ -9,6 +9,14 @@ import { getOutputDir, setOutputDir } from './store'
 const ytDlp = new YtDlpService()
 const downloads = new DownloadManager()
 
+// Ikona okna (i taskbara w dev). W paczce na Windows/macOS finalną ikonę aplikacji
+// nadaje electron-builder z build/icon.ico / icon.icns. Tu pokrywamy okno i tryb dev.
+function resolveAppIcon(): string {
+  return process.env['ELECTRON_RENDERER_URL']
+    ? join(process.cwd(), 'src/renderer/public/app-icon.png') // dev
+    : join(__dirname, '../renderer/app-icon.png') // prod (public/ kopiowane do renderer)
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1100,
@@ -17,6 +25,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
+    icon: resolveAppIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
